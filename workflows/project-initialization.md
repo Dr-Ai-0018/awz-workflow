@@ -9,14 +9,16 @@
 - git 初始化在 `main` 分支；
 - `.gitignore`；
 - `.env.example`；
-- `AGENTS.md`；
-- `CLAUDE.md`，并导入 `AGENTS.md`；
+- 本地 ignored `AGENTS.md`；
+- 本地 ignored `CLAUDE.md`，并导入 `AGENTS.md`；
 - 本地 ignored `docs/`；
 - 本地 ignored `temp/`；
 - license，默认 MIT；
 - README，包含 quickstart 和常用命令。
 
 注意：必需基线不包含 `pyproject.toml`、`package.json`、Docker、CI 或部署配置。
+
+注意：`AGENTS.md` 和 `CLAUDE.md` 会生成在项目根目录，方便本地 Agent 读取，但默认不进 git。
 
 ## 忽略规则
 
@@ -26,6 +28,8 @@
 .codex/
 .claude/
 .vscode/
+/AGENTS.md
+/CLAUDE.md
 .env
 .env.*
 !.env.example
@@ -151,10 +155,11 @@ tests/
 
 1. 确认 `git status --short`。
 2. 确认 ignored 路径没有被 staged。
-3. 确认 `.env.example` 能被 git 看到。
-4. 确认 `docs/agent-room/status.md` 已生成。
-5. 确认 `docs/README.md`、`temp/README.md`、review/release/handoff/decision 模板已生成到 ignored 本地工作区。
-6. 运行最小可用 smoke command。
-7. 总结已经生成什么，以及哪些东西是故意没生成。
+3. 确认 `AGENTS.md`、`CLAUDE.md`、`docs/`、`temp/` 不会被 git 看到。
+4. 确认 `.env.example` 能被 git 看到。
+5. 确认 `docs/agent-room/status.md` 已生成。
+6. 确认 `docs/README.md`、`temp/README.md`、review/release/handoff/decision 模板已生成到 ignored 本地工作区。
+7. 运行最小可用 smoke command。
+8. 总结已经生成什么，以及哪些东西是故意没生成。
 
 详见 `workflows/verification-baseline.md`。

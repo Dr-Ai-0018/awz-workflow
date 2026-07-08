@@ -18,6 +18,8 @@
 - `.codex/`
 - `.claude/`
 - `.vscode/`
+- `AGENTS.md`
+- `CLAUDE.md`
 - `.env`
 - `.env.*`
 - `docs/`
@@ -26,8 +28,8 @@
 应该提交：
 
 - `.env.example`
-- `AGENTS.md`
-- 用来导入 `AGENTS.md` 的 `CLAUDE.md`
+
+注意：`AGENTS.md` 和 `CLAUDE.md` 是本地 Agent 指令文件，初始化会生成，但默认不进 git。
 
 ## Agent 交流区
 

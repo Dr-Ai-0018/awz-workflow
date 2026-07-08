@@ -2,6 +2,8 @@
 .codex/
 .claude/
 .vscode/
+/AGENTS.md
+/CLAUDE.md
 
 # 密钥与环境变量
 .env

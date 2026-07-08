@@ -52,6 +52,7 @@ npm test
 
 ## 仓库说明
 
+- 根目录 `AGENTS.md` 和 `CLAUDE.md` 被 git 忽略，用来给本地 AI Agent 读取。
 - 本地 `docs/` 被 git 忽略，用来写计划、debug、AI 协作记录。
 - 本地 `docs/agent-room/` 是 Agent 交流区，用来放状态板、handoff、review checklist 和决策草稿。
 - 本地 `temp/` 被 git 忽略，用来放结构化临时产物。

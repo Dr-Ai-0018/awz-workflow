@@ -52,6 +52,8 @@ docs/
 - `.codex/`
 - `.claude/`
 - `.vscode/`
+- `AGENTS.md`
+- `CLAUDE.md`
 - `.env`
 - `.env.*`
 - `docs/`
@@ -60,8 +62,8 @@ docs/
 必要例外：
 
 - `.env.example` 必须进 git。
-- 根目录 `AGENTS.md` 必须进 git。
-- 根目录 `CLAUDE.md` 如果只是导入 `AGENTS.md` 并放共享说明，可以进 git。
+- `templates/project/AGENTS.md` 和 `templates/project/CLAUDE.md` 作为初始化模板可以进 git。
+- 初始化生成到项目根目录的 `AGENTS.md` 和 `CLAUDE.md` 默认只留本地，不进 git。
 
 每个初始化后的 git 项目都必须有可靠的 `.gitignore`。缺失 `.gitignore` 视为初始化缺陷，因为它很容易把本地状态和临时产物塞爆 git。
 
