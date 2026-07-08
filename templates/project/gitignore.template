@@ -1,0 +1,40 @@
+# 本地/私人工具状态
+.codex/
+.claude/
+.vscode/
+
+# 密钥与环境变量
+.env
+.env.*
+!.env.example
+
+# 本地 AI 协作和临时工作区
+docs/
+temp/
+
+# 系统/编辑器噪音
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+dist/
+build/
+.turbo/
+.vite/
+coverage/
+
+# 日志和生成产物
+*.log
+*.tmp
+*.bak
