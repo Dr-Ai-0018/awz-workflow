@@ -8,6 +8,7 @@
 2. `CLAUDE.md`：Claude Code 入口，通常导入 `AGENTS.md`。
 3. `README.md`：项目目标和公开运行方式。
 4. `docs/agent-room/status.md`：当前阶段、owner、阻塞项和下一步。
+5. `docs/agent-room/awz-baseline.md`：完整 AWZ 默认偏好、边界和协作规则。
 
 ## 按任务继续读
 
@@ -15,6 +16,7 @@
 
 - `docs/README.md`
 - `temp/README.md`
+- `docs/agent-room/awz-baseline.md`
 
 多 Agent 协作：
 

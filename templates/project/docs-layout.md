@@ -7,6 +7,7 @@
 ```text
 docs/
 ├─ agent-room/
+│  ├─ awz-baseline.md
 │  ├─ status.md
 │  ├─ handoffs/
 │  ├─ reviews/
@@ -18,6 +19,7 @@ docs/
 使用规则：
 
 - `agent-room/status.md` 记录当前阶段、owner、阻塞项和下一步；
+- `agent-room/awz-baseline.md` 保存完整 AWZ 默认偏好、边界和协作规则；
 - `agent-room/handoffs/` 放跨 Agent 交接；
 - `agent-room/reviews/` 放 P0/P1/P2/P3 checklist；
 - `agent-room/decisions/` 放本地 ADR 草稿和方案对比；

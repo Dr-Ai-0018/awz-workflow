@@ -15,6 +15,7 @@
 
 - 先读本文件，再读 `README.md` 和 `docs/agent-room/status.md`。
 - 新 Agent 进入项目时，读 `docs/agent-room/onboarding.md`。
+- 需要完整理解 AWZ Workflow 时，读 `docs/agent-room/awz-baseline.md`。
 - 多 Agent 协作时，读 `docs/agent-room/handoffs/` 和当前 owner 表。
 - review/debug/hardening 时，读或创建 `docs/agent-room/reviews/` 下的 checklist。
 - 不要机械读取所有文件；按任务类型扩展上下文。
