@@ -48,6 +48,7 @@ v0.1 先覆盖这些事情：
 │  └─ awz-workflow-v0.1.md
 ├─ workflows/
 │  ├─ dual-agent-development.md
+│  ├─ agent-onboarding.md
 │  ├─ project-initialization.md
 │  ├─ review-and-fix.md
 │  └─ verification-baseline.md
@@ -61,6 +62,7 @@ v0.1 先覆盖这些事情：
    └─ project/
       ├─ AGENTS.md
       ├─ CLAUDE.md
+      ├─ agent-onboarding.md
       ├─ agent-status.template.md
       ├─ handoff.template.md
       ├─ decision-record.template.md

@@ -148,6 +148,7 @@ foreach ($dir in $localDirs) {
 
 $localFiles = @(
     @{ Source = "docs-layout.md"; Dest = "docs/README.md"; Render = $false },
+    @{ Source = "agent-onboarding.md"; Dest = "docs/agent-room/onboarding.md"; Render = $false },
     @{ Source = "agent-status.template.md"; Dest = "docs/agent-room/status.md"; Render = $true },
     @{ Source = "handoff.template.md"; Dest = "docs/agent-room/handoffs/handoff.template.md"; Render = $false },
     @{ Source = "review-checklist.template.md"; Dest = "docs/agent-room/reviews/review-checklist.template.md"; Render = $false },
