@@ -14,7 +14,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $templateRoot = Join-Path $root "templates/project"
 
 if (-not (Test-Path -LiteralPath $templateRoot)) {
-    throw "模板目录不存在：$templateRoot"
+    throw "Template directory not found: $templateRoot"
 }
 
 $target = Resolve-Path -LiteralPath $TargetPath -ErrorAction SilentlyContinue
@@ -22,7 +22,7 @@ $target = Resolve-Path -LiteralPath $TargetPath -ErrorAction SilentlyContinue
 if ($null -eq $target) {
     $targetPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($TargetPath)
     if ($DryRun) {
-        Write-Host "DryRun：目标目录不存在，将创建 $targetPath"
+        Write-Host "DryRun: target directory does not exist; would create $targetPath"
     }
     else {
         New-Item -ItemType Directory -Path $TargetPath | Out-Null
@@ -41,7 +41,7 @@ function Get-TemplateContent {
 
     $source = Join-Path $templateRoot $SourceName
     if (-not (Test-Path -LiteralPath $source)) {
-        throw "模板文件不存在：$SourceName"
+        throw "Template file not found: $SourceName"
     }
 
     $content = Get-Content -LiteralPath $source -Raw
@@ -62,16 +62,16 @@ function Write-GeneratedFile {
     $destDir = Split-Path -Parent $dest
 
     if ((Test-Path -LiteralPath $dest) -and (-not $Force)) {
-        Write-Host "跳过已存在文件 $DestName"
+        Write-Host "Skip existing file: $DestName"
         return
     }
 
     if ($DryRun) {
         if ((Test-Path -LiteralPath $dest) -and $Force) {
-            Write-Host "DryRun：将覆盖 $DestName"
+            Write-Host "DryRun: would overwrite $DestName"
         }
         else {
-            Write-Host "DryRun：将写入 $DestName"
+            Write-Host "DryRun: would write $DestName"
         }
         return
     }
@@ -87,12 +87,12 @@ function Write-GeneratedFile {
     else {
         $source = Join-Path $templateRoot $SourceName
         if (-not (Test-Path -LiteralPath $source)) {
-            throw "模板文件不存在：$SourceName"
+            throw "Template file not found: $SourceName"
         }
         Copy-Item -LiteralPath $source -Destination $dest -Force:$Force
     }
 
-    Write-Host "写入 $DestName"
+    Write-Host "Wrote $DestName"
 }
 
 function Ensure-LocalDirectory {
@@ -104,12 +104,12 @@ function Ensure-LocalDirectory {
     }
 
     if ($DryRun) {
-        Write-Host "DryRun：将创建目录 $DirName"
+        Write-Host "DryRun: would create directory $DirName"
         return
     }
 
     New-Item -ItemType Directory -Path $path | Out-Null
-    Write-Host "创建目录 $DirName"
+    Write-Host "Created directory $DirName"
 }
 
 $rootFiles = @(
@@ -172,18 +172,18 @@ foreach ($file in $localFiles) {
 
 if (-not (Test-Path -LiteralPath (Join-Path $targetPath ".git"))) {
     if ($DryRun) {
-        Write-Host "DryRun：将执行 git init -b main"
+        Write-Host "DryRun: would run git init -b main"
     }
     else {
         git -C $targetPath init -b main | Out-Null
-        Write-Host "已执行 git init -b main"
+        Write-Host "Ran git init -b main"
     }
 }
 
 if ($DryRun) {
-    Write-Host "DryRun：不会生成 pyproject.toml、package.json、Docker、CI 或部署配置，除非后续明确选择对应项目类型。"
-    Write-Host "DryRun：预演完成，未写入任何文件：$targetPath"
+    Write-Host "DryRun: will not generate pyproject.toml, package.json, Docker, CI, or deployment config unless a matching project type is chosen later."
+    Write-Host "DryRun: preview complete; no files were written: $targetPath"
 }
 else {
-    Write-Host "AWZ 项目基线已初始化：$targetPath"
+    Write-Host "AWZ project baseline initialized: $targetPath"
 }
