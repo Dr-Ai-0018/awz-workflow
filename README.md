@@ -63,7 +63,7 @@ v0.1 先覆盖这些事情：
       ├─ AGENTS.md
       ├─ CLAUDE.md
       ├─ agent-onboarding.md
-      ├─ awz-baseline.md
+      ├─ guides/
       ├─ agent-status.template.md
       ├─ handoff.template.md
       ├─ decision-record.template.md

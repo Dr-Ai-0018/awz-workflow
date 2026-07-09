@@ -7,8 +7,8 @@
 ```text
 docs/
 ├─ agent-room/
-│  ├─ awz-baseline.md
 │  ├─ status.md
+│  ├─ guides/
 │  ├─ handoffs/
 │  ├─ reviews/
 │  ├─ decisions/
@@ -19,7 +19,7 @@ docs/
 使用规则：
 
 - `agent-room/status.md` 记录当前阶段、owner、阻塞项和下一步；
-- `agent-room/awz-baseline.md` 保存完整 AWZ 默认偏好、边界和协作规则；
+- `agent-room/guides/` 按任务类型保存分层指导；
 - `agent-room/handoffs/` 放跨 Agent 交接；
 - `agent-room/reviews/` 放 P0/P1/P2/P3 checklist；
 - `agent-room/decisions/` 放本地 ADR 草稿和方案对比；
@@ -28,6 +28,14 @@ docs/
 
 初始化脚本会在对应目录放入轻量模板：
 
+- `agent-room/guides/collaboration.md`
+- `agent-room/guides/repository-hygiene.md`
+- `agent-room/guides/git-workflow.md`
+- `agent-room/guides/verification.md`
+- `agent-room/guides/code-architecture.md`
+- `agent-room/guides/frontend.md`
+- `agent-room/guides/blockers-and-safety.md`
+- `agent-room/guides/review.md`
 - `agent-room/handoffs/handoff.template.md`
 - `agent-room/reviews/review-checklist.template.md`
 - `agent-room/decisions/decision-record.template.md`

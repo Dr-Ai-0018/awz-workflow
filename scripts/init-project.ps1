@@ -128,6 +128,7 @@ foreach ($file in $rootFiles) {
 $localDirs = @(
     "docs",
     "docs/agent-room",
+    "docs/agent-room/guides",
     "docs/agent-room/handoffs",
     "docs/agent-room/reviews",
     "docs/agent-room/decisions",
@@ -149,7 +150,14 @@ foreach ($dir in $localDirs) {
 $localFiles = @(
     @{ Source = "docs-layout.md"; Dest = "docs/README.md"; Render = $false },
     @{ Source = "agent-onboarding.md"; Dest = "docs/agent-room/onboarding.md"; Render = $false },
-    @{ Source = "awz-baseline.md"; Dest = "docs/agent-room/awz-baseline.md"; Render = $false },
+    @{ Source = "guides/collaboration.md"; Dest = "docs/agent-room/guides/collaboration.md"; Render = $false },
+    @{ Source = "guides/repository-hygiene.md"; Dest = "docs/agent-room/guides/repository-hygiene.md"; Render = $false },
+    @{ Source = "guides/git-workflow.md"; Dest = "docs/agent-room/guides/git-workflow.md"; Render = $false },
+    @{ Source = "guides/verification.md"; Dest = "docs/agent-room/guides/verification.md"; Render = $false },
+    @{ Source = "guides/code-architecture.md"; Dest = "docs/agent-room/guides/code-architecture.md"; Render = $false },
+    @{ Source = "guides/frontend.md"; Dest = "docs/agent-room/guides/frontend.md"; Render = $false },
+    @{ Source = "guides/blockers-and-safety.md"; Dest = "docs/agent-room/guides/blockers-and-safety.md"; Render = $false },
+    @{ Source = "guides/review.md"; Dest = "docs/agent-room/guides/review.md"; Render = $false },
     @{ Source = "agent-status.template.md"; Dest = "docs/agent-room/status.md"; Render = $true },
     @{ Source = "handoff.template.md"; Dest = "docs/agent-room/handoffs/handoff.template.md"; Render = $false },
     @{ Source = "review-checklist.template.md"; Dest = "docs/agent-room/reviews/review-checklist.template.md"; Render = $false },

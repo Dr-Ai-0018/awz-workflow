@@ -36,7 +36,7 @@
 docs/
 docs/agent-room/
 docs/agent-room/onboarding.md
-docs/agent-room/awz-baseline.md
+docs/agent-room/guides/
 docs/agent-room/handoffs/
 docs/agent-room/reviews/
 docs/agent-room/decisions/
@@ -160,7 +160,7 @@ tests/
 3. 确认 `AGENTS.md`、`CLAUDE.md`、`docs/`、`temp/` 不会被 git 看到。
 4. 确认 `.env.example` 能被 git 看到。
 5. 确认 `docs/agent-room/status.md` 已生成。
-6. 确认 `docs/README.md`、`temp/README.md`、agent onboarding、AWZ baseline、review/release/handoff/decision 模板已生成到 ignored 本地工作区。
+6. 确认 `docs/README.md`、`temp/README.md`、agent onboarding、分层 guides、review/release/handoff/decision 模板已生成到 ignored 本地工作区。
 7. 运行最小可用 smoke command。
 8. 总结已经生成什么，以及哪些东西是故意没生成。
 
