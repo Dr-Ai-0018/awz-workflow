@@ -44,7 +44,7 @@ function Get-TemplateContent {
         throw "Template file not found: $SourceName"
     }
 
-    $content = Get-Content -LiteralPath $source -Raw
+    $content = Get-Content -LiteralPath $source -Raw -Encoding UTF8
     $content = $content.Replace("{{PROJECT_NAME}}", $script:resolvedProjectName)
     $content = $content.Replace("{{YEAR}}", $script:resolvedYear)
     $content = $content.Replace("{{OWNER}}", $Owner)
