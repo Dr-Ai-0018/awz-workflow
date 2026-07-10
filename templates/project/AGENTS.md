@@ -56,6 +56,13 @@
 - 小项目默认不需要 Docker。
 - Docker、CI、部署流在项目规模需要时再加。
 
+## 文件搜索
+
+- 跨目录、跨盘、面向未知位置的文件定位，优先走本机 Everything HTTP API：`http://localhost:8080/?search=<QUERY>&json=1&count=<N>`。
+- 不要用 `Get-ChildItem -Recurse` / `find` 去扫全盘或大目录树，数量级更慢，且会漏掉权限受限的路径。
+- Everything 探测不到（服务未开、非 Windows/NTFS 环境）再回退到语言原生工具。
+- 常用查询语法、探测和回退顺序见 `docs/agent-room/guides/verification.md`。
+
 ## Git
 
 - 默认分支：`main`。

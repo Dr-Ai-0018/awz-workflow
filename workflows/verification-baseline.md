@@ -123,6 +123,59 @@
 
 不要只说“测试通过”。要说明跑了什么，以及没跑什么。
 
+## 文件定位
+
+跨目录、跨盘、面向未知位置的文件定位，优先走 Everything HTTP API，不要用 `Get-ChildItem -Recurse` / `find` 手动遍历。
+
+基准数据（341 万文件的机器上）：小项目 100x，`C:\Windows` 全体 6800x，全盘搜索 PS 端 300 秒超时未完成、Everything 50–120ms 秒回。差距是结构性的（NTFS MFT + USN Journal 内存索引 vs 递归系统调用），不是"快一点"。
+
+### 探测
+
+任何 Agent 在使用前先探测端点是否可用：
+
+```powershell
+try {
+    $r = Invoke-WebRequest 'http://localhost:8080/' -UseBasicParsing -TimeoutSec 3
+    $ok = $r.Headers['Server'] -match 'Everything'
+} catch { $ok = $false }
+```
+
+`Server: Everything HTTP Server` 存在即可用。默认端口 8080，用户改过就跟随实际配置。
+
+### 查询语法
+
+URL：`http://localhost:8080/?search=<QUERY>&json=1&count=<N>[&path_column=1&size_column=1]`
+
+`<QUERY>` 需要 URL encode（PowerShell：`[uri]::EscapeDataString($q)`）。常用 filter：
+
+- `ext:md`：按扩展名。
+- `path:E:\Project`：限定路径前缀，含空格用 `path:"E:\A B"`。
+- `!folder:`：排除文件夹结果，只留 file。
+- `folder:`：只留文件夹结果。
+- `size:>10mb`、`dm:today`：大小/时间过滤。
+- 直接输 `readme`：文件名 substring 匹配。
+- 多条件空格连接为 AND，`|` 为 OR。
+
+返回 JSON 形状：
+
+```json
+{ "totalResults": 6829, "results": [ { "type": "file", "name": "...", "path": "...", "size": "..." } ] }
+```
+
+`totalResults` 永远是全量结果数，不受 `count` 限制。结果集大时用 `count=` + `offset=` 分页，别一次拉几十万条。
+
+### 回退顺序
+
+1. 探测通过 → 走 Everything HTTP。
+2. 端点不可达（服务未开、Linux/macOS、非 NTFS 卷）→ 回退到 `Get-ChildItem -Recurse` / `find` / `rg --files`。
+3. 回退时如果范围显然过大（全盘 / 百万文件级目录），先说明预期耗时或收窄范围，不要静默硬跑。
+
+### 边界
+
+- 只索引 NTFS 卷；FAT32、exFAT、网络盘、WSL 里的 Linux 文件系统不进索引。
+- 默认不索引文件**内容**（只有名字、路径、元数据）；`content:` 语法需要用户在 UI 里手动打开内容索引，默认视为不支持。
+- 索引经内核 raw volume 读取，包含普通 PS 因 ACL 看不到的路径。这是能力优势，但意味着结果可能大于/不同于用户态遍历。
+
 ## 测试目录
 
 验证初始化脚本、生成器或一次性输出时，默认使用本项目的 `temp/` 目录。

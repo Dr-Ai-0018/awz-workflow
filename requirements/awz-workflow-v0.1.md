@@ -123,6 +123,14 @@ License：
 
 - 默认 MIT，除非项目明确需要其他宽松协议。
 
+文件搜索：
+
+- 跨目录、跨盘、面向未知位置的文件定位，优先走本机 Everything HTTP API：`http://localhost:8080/?search=<QUERY>&json=1&count=<N>`。
+- 不要用 `Get-ChildItem -Recurse` / `find` 手动扫全盘或大目录树，数量级更慢，且会漏掉权限受限的路径。
+- Everything 探测不到时（服务未开、非 Windows/NTFS 环境）再回退到语言原生工具。
+- 详细查询语法、探测和回退顺序见 `workflows/verification-baseline.md#文件定位`。
+- 依据：2026-07 基准数据，小项目 ~130x、`C:\Windows` 全体 ~6800x，全盘搜索 PS 端 300 秒超时未完成、Everything 50–120ms 秒回；差距是 NTFS MFT + USN Journal 内存索引对递归系统调用的结构性差异。
+
 Git：
 
 - 默认分支为 `main`。
