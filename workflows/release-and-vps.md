@@ -8,7 +8,7 @@
 
 `v0.1` 历史版本只有 Windows 初始化入口。`v0.2.0` 已完成 Windows PowerShell 与真实 Ubuntu VPS 的初始化、打包和解压隔离 smoke，可作为第一个正式跨平台 release。
 
-当前开发版本已具备：
+当前正式版本具备：
 
 - Windows 初始化入口是 `scripts/init-project.ps1`；
 - Ubuntu/POSIX 初始化入口是 `scripts/init-project.sh`；
@@ -18,9 +18,9 @@
 
 因此，Ubuntu 命令可作为正式 `v0.2.0` 路径使用；后续版本仍必须重跑同一套跨平台 smoke。
 
-## v0.2 交付目标
+## 正式发布基线
 
-在宣布支持 VPS 前，至少完成并通过验证：
+任意正式版本至少完成并通过验证：
 
 ```text
 VERSION
@@ -104,6 +104,18 @@ awz-workflow-v0.2.0/
 5. 包内不含密钥、`.env`、本地 Agent 状态、`docs/`、`temp/` 或 `.git/`。
 6. 记录版本、commit SHA、打包时间和验证命令。
 
+模板或初始化器变更后，先运行对应平台的轻量回归 smoke：
+
+```powershell
+.\scripts\smoke-init-project.ps1
+```
+
+```bash
+bash scripts/smoke-init-project.sh
+```
+
+它覆盖 dry-run、`main` 初始化、忽略规则、重复运行、`--force`/`-Force`、非法文件目标和工作流源码目录保护；release 前的解压隔离 smoke 仍需单独执行。
+
 打包入口默认拒绝 dirty worktree。仅为本地 smoke 时，可以显式使用 `-AllowDirty` 或 `--allow-dirty`；正式 release 禁止使用这个开关。
 
 Windows：
@@ -162,22 +174,9 @@ git status --ignored --short AGENTS.md CLAUDE.md docs temp
 
 业务项目是否添加 `pyproject.toml`、`package.json`、Docker、CI、部署配置，仍由项目技术栈与规模决定，不由初始化器代替决策。
 
-## 远端仓库时机
+## 远端发布
 
-现在不必为了“看起来正式”抢先建云端仓库。建议在以下条件同时满足后再建：
-
-1. `init-project.sh` 已实现；
-2. Windows 与 Linux 的 dry-run/真实 smoke 已跑通；
-3. `VERSION`、`CHANGELOG.md`、打包脚本与 release 包已准备好；
-4. 确认仓库公开或私有，以及是否使用 GitHub Releases。
-
-在这之前，要马上给一台 VPS 使用时，可以从本地打出 `.tar.gz`，通过 `scp` 上传，不依赖远端仓库：
-
-```bash
-scp awz-workflow-v0.2.0.tar.gz user@server:/tmp/
-```
-
-远端仓库建立后，推荐把 tag 对应的 `.tar.gz` 附到 GitHub Release；VPS 只下载固定版本包，不直接运行 `main` 上的漂移脚本。
+推荐把 tag 对应的 `.tar.gz` 附到 GitHub Release；VPS 只下载固定版本包，不直接运行 `main` 上的漂移脚本。正式发布后，release note 至少记录版本、commit SHA、打包时间和两端 smoke 结论。
 
 ## 验证与回退
 
@@ -190,12 +189,10 @@ scp awz-workflow-v0.2.0.tar.gz user@server:/tmp/
 3. 回退到上一个 tag 对应的完整 `.tar.gz`；
 4. 修复后重新打包、验证，再创建新的 patch tag，不改写已发布 tag。
 
-## 实施顺序
+## 后续发布流程
 
-1. 增加 `VERSION`、`CHANGELOG.md` 和 `dist/` 忽略规则。
-2. 实现并在 Ubuntu 环境验证 `init-project.sh`。
-3. 为两个平台实现 release 打包，并做解压后隔离 smoke。
-4. 以 `v0.2.0` 打第一个可用 release 包。
-5. 再创建远端仓库、推送 `main` 和 tag，并按需发布 GitHub Release。
-
-在第 2 步以前，AWZ Workflow 的可执行初始化范围仍是 Windows PowerShell。
+1. 更新 `VERSION`、`CHANGELOG.md` 和用户可见文档。
+2. 运行 Windows 与 Ubuntu/POSIX 的 dry-run、真实初始化和隔离解压 smoke。
+3. 使用干净工作区打包，检查包内容与版本信息。
+4. 创建新的 tag、推送 `main` 与 tag，并发布对应 GitHub Release。
+5. 不改写已发布 tag；发现问题时发布新的 patch 版本。

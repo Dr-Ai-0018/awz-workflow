@@ -6,39 +6,15 @@
 
 ## 快速开始
 
-```powershell
-# Python 项目本地优先 uv
-uv sync
-uv run pytest
+当前基线尚未假定技术栈。确定项目实际使用 Python、Node 或其他工具链后，再在这里写入已经验证过的安装、启动和测试命令。
 
-# 前端项目本地优先 pnpm
-pnpm install
-pnpm test
-```
-
-如果没有 `uv` 或 `pnpm`，使用下面的部署兼容 fallback。
-
-## Fallback Setup
-
-Python：
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-pytest
-```
-
-Node：
-
-```powershell
-npm install
-npm test
-```
+- Python 本地开发优先 `uv`；涉及部署时兼容 `venv`。
+- Node/frontend 本地开发优先 `pnpm`；涉及部署时兼容 `npm`。
+- 不要因为这份模板存在，就生成不需要的 `pyproject.toml`、`package.json` 或依赖文件。
 
 ## 常用命令
 
-在这里补充项目自己的命令。
+在这里补充已经验证过的项目命令。
 
 ```powershell
 # lint
