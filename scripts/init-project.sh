@@ -69,16 +69,41 @@ done
 [[ -n "$target_input" ]] || die '--target is required.'
 [[ -d "$template_root" ]] || die "Template directory not found: $template_root"
 
+if [[ -e "$target_input" && ! -d "$target_input" ]]; then
+    die "Target path is not a directory: $target_input"
+fi
+
 if [[ -z "$project_name" ]]; then
     project_name=$(basename "${target_input%/}")
 fi
 
+target_needs_creation=false
 if [[ -d "$target_input" ]]; then
     target_path=$(cd "$target_input" && pwd -P)
-elif [[ "$dry_run" == true ]]; then
-    target_path=$target_input
-    printf 'DryRun: target directory does not exist; would create %s\n' "$target_path"
 else
+    target_path=$target_input
+    target_needs_creation=true
+    if [[ "$dry_run" == true ]]; then
+        printf 'DryRun: target directory does not exist; would create %s\n' "$target_path"
+    fi
+fi
+
+[[ "$target_path" != "$root" ]] || die "Target path cannot be the AWZ Workflow source directory: $root"
+
+needs_git_init=false
+if [[ ! -d "$target_path/.git" ]]; then
+    needs_git_init=true
+fi
+
+if [[ "$needs_git_init" == true ]] && ! command -v git >/dev/null 2>&1; then
+    if [[ "$dry_run" == true ]]; then
+        printf '%s\n' 'DryRun: git is unavailable; real initialization would stop before writing files.'
+    else
+        die 'Git is required to initialize a new repository. Install Git, then run the initializer again.'
+    fi
+fi
+
+if [[ "$target_needs_creation" == true && "$dry_run" != true ]]; then
     mkdir -p "$target_input"
     target_path=$(cd "$target_input" && pwd -P)
 fi
@@ -203,9 +228,7 @@ for file in "${local_files[@]}"; do
     write_generated_file "$source" "$dest" "$render"
 done
 
-if [[ ! -d "$target_path/.git" ]]; then
-    command -v git >/dev/null 2>&1 || die 'Git is required. Install Git, then run the initializer again.'
-
+if [[ "$needs_git_init" == true ]]; then
     if [[ "$dry_run" == true ]]; then
         printf 'DryRun: would run git init -b main\n'
     else

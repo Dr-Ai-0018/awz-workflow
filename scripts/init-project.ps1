@@ -12,25 +12,46 @@ $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
 $templateRoot = Join-Path $root "templates/project"
+$rootPath = (Resolve-Path -LiteralPath $root).Path
 
 if (-not (Test-Path -LiteralPath $templateRoot)) {
     throw "Template directory not found: $templateRoot"
 }
 
-$target = Resolve-Path -LiteralPath $TargetPath -ErrorAction SilentlyContinue
+$target = Get-Item -LiteralPath $TargetPath -Force -ErrorAction SilentlyContinue
 
 if ($null -eq $target) {
     $targetPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($TargetPath)
     if ($DryRun) {
         Write-Host "DryRun: target directory does not exist; would create $targetPath"
     }
-    else {
-        New-Item -ItemType Directory -Path $TargetPath | Out-Null
-        $targetPath = (Resolve-Path -LiteralPath $TargetPath).Path
-    }
 }
 else {
-    $targetPath = $target.Path
+    if (-not $target.PSIsContainer) {
+        throw "Target path is not a directory: $TargetPath"
+    }
+
+    $targetPath = $target.FullName
+}
+
+if ([string]::Equals($targetPath, $rootPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Target path cannot be the AWZ Workflow source directory: $rootPath"
+}
+
+$needsGitInit = -not (Test-Path -LiteralPath (Join-Path $targetPath ".git"))
+$gitAvailable = $null -ne (Get-Command git -ErrorAction SilentlyContinue)
+if ($needsGitInit -and (-not $gitAvailable)) {
+    if ($DryRun) {
+        Write-Host "DryRun: git is unavailable; real initialization would stop before writing files."
+    }
+    else {
+        throw "Git is required to initialize a new repository. Install Git, then run the initializer again."
+    }
+}
+
+if (($null -eq $target) -and (-not $DryRun)) {
+    New-Item -ItemType Directory -Path $TargetPath | Out-Null
+    $targetPath = (Resolve-Path -LiteralPath $TargetPath).Path
 }
 
 $resolvedProjectName = if ($ProjectName) { $ProjectName } else { Split-Path -Leaf $targetPath }
@@ -170,7 +191,7 @@ foreach ($file in $localFiles) {
     Write-GeneratedFile -SourceName $file.Source -DestName $file.Dest -Render:([bool]$file.Render)
 }
 
-if (-not (Test-Path -LiteralPath (Join-Path $targetPath ".git"))) {
+if ($needsGitInit) {
     if ($DryRun) {
         Write-Host "DryRun: would run git init -b main"
     }
