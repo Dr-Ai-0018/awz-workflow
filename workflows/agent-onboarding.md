@@ -25,6 +25,13 @@
 - `workflows/verification-baseline.md`
 - `style/git-style.md`
 
+Ubuntu/VPS 初始化、release 包或远端发布：
+
+- `workflows/release-and-vps.md`
+- `workflows/project-initialization.md`
+- `workflows/verification-baseline.md`
+- `style/git-style.md`
+
 多 Agent 协作：
 
 - `workflows/dual-agent-development.md`

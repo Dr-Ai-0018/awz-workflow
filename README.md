@@ -51,6 +51,7 @@ v0.1 先覆盖这些事情：
 │  ├─ agent-onboarding.md
 │  ├─ project-initialization.md
 │  ├─ review-and-fix.md
+│  ├─ release-and-vps.md
 │  └─ verification-baseline.md
 ├─ style/
 │  ├─ code-architecture-baseline.md
@@ -86,6 +87,10 @@ v0.1 先覆盖这些事情：
 - 中大型阶段或多 Agent 协作优先使用短生命周期 topic branch，完成后合并回 `main`。
 - commit 按 logical change 切分，不要过碎，也不要把无关主题塞进一个大 commit。
 - 小项目保持轻量；Docker、GitHub Actions、Cloudflare Pages 等在项目规模需要时再加入。
+
+## VPS 与发布
+
+当前 `v0.1` 的可执行初始化入口是 Windows PowerShell 的 `scripts/init-project.ps1`。Ubuntu/VPS 的一键初始化、跨平台 release 包和远端发布流程已在 [Release 与 VPS 初始化工作流](workflows/release-and-vps.md) 定义为 `v0.2` 交付目标；在 Linux 初始化器实际完成和验证前，不把它写成已经可用的能力。
 
 ## 硬边界
 
