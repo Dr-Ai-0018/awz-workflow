@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-`v0.1` 历史版本只有 Windows 初始化入口。当前工作区正在构建 `v0.2.0-dev`，在开发版本验证完成前仍不能把它当正式 release。
+`v0.1` 历史版本只有 Windows 初始化入口。`v0.2.0` 已完成 Windows PowerShell 与真实 Ubuntu VPS 的初始化、打包和解压隔离 smoke，可作为第一个正式跨平台 release。
 
 当前开发版本已具备：
 
@@ -14,9 +14,9 @@
 - Ubuntu/POSIX 初始化入口是 `scripts/init-project.sh`；
 - 两端都支持 dry-run、强制覆盖、UTF-8 模板渲染和 `git init -b main`；
 - Windows 与 POSIX 的 release 打包入口分别是 `package-release.ps1`、`package-release.sh`；
-- Windows 侧 smoke 已验证；正式 `v0.2.0` 前仍要在真实 Ubuntu/VPS 运行 Linux 初始化和解压隔离 smoke。
+- Windows PowerShell 与真实 Ubuntu VPS 的 dry-run、真实初始化和解压隔离 smoke 均已验证。
 
-因此，Ubuntu 命令现在可以作为开发版路径使用，但在真实 Ubuntu 验证完成前，不能把它宣称为正式稳定 release。
+因此，Ubuntu 命令可作为正式 `v0.2.0` 路径使用；后续版本仍必须重跑同一套跨平台 smoke。
 
 ## v0.2 交付目标
 

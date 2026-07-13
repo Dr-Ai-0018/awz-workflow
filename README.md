@@ -95,7 +95,7 @@ v0.1 先覆盖这些事情：
 
 ## VPS 与发布
 
-当前开发版本由 `VERSION` 管理。Windows 使用 `scripts/init-project.ps1`，Ubuntu/POSIX 使用 `scripts/init-project.sh`；两端都先运行 dry-run，再进行真实初始化。跨平台 release 包和 VPS 使用方式见 [Release 与 VPS 初始化工作流](workflows/release-and-vps.md)。正式 `v0.2.0` tag 只能在两端初始化器、解压隔离 smoke 和 release 包验证通过后创建。
+当前发布版本由 `VERSION` 管理。Windows 使用 `scripts/init-project.ps1`，Ubuntu/POSIX 使用 `scripts/init-project.sh`；两端都先运行 dry-run，再进行真实初始化。跨平台 release 包和 VPS 使用方式见 [Release 与 VPS 初始化工作流](workflows/release-and-vps.md)。每个正式 tag 都必须经过两端初始化器、解压隔离 smoke 和 release 包验证。
 
 ## 硬边界
 
