@@ -29,6 +29,7 @@ __pycache__/
 
 # Node
 node_modules/
+# Build and release artifacts
 dist/
 build/
 .turbo/

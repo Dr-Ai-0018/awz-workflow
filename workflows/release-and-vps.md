@@ -6,18 +6,21 @@
 
 ## 当前状态
 
-截至 `v0.1`：
+`v0.1` 历史版本只有 Windows 初始化入口。当前工作区正在构建 `v0.2.0-dev`，在开发版本验证完成前仍不能把它当正式 release。
+
+当前开发版本已具备：
 
 - Windows 初始化入口是 `scripts/init-project.ps1`；
-- 它已支持 `-DryRun`、`-Force`、UTF-8 模板渲染和 `git init -b main`；
-- 它**不能**作为 Ubuntu 的默认入口；
-- 仓库尚未提供 Linux 初始化脚本、版本包或远端 release。
+- Ubuntu/POSIX 初始化入口是 `scripts/init-project.sh`；
+- 两端都支持 dry-run、强制覆盖、UTF-8 模板渲染和 `git init -b main`；
+- Windows 与 POSIX 的 release 打包入口分别是 `package-release.ps1`、`package-release.sh`；
+- Windows 侧 smoke 已验证；正式 `v0.2.0` 前仍要在真实 Ubuntu/VPS 运行 Linux 初始化和解压隔离 smoke。
 
-因此，在 Linux 初始化器完成前，不能在 VPS 文档里宣称 AWZ Workflow 已可一键初始化。可以先保留手动初始化需求，但不应把未验证的命令当正式路径。
+因此，Ubuntu 命令现在可以作为开发版路径使用，但在真实 Ubuntu 验证完成前，不能把它宣称为正式稳定 release。
 
 ## v0.2 交付目标
 
-在宣布支持 VPS 前，至少完成：
+在宣布支持 VPS 前，至少完成并通过验证：
 
 ```text
 VERSION
@@ -62,7 +65,7 @@ set -euo pipefail
 
 实现时遵守：
 
-1. 只依赖 Ubuntu 常见基础工具：`bash`、`cp`、`mkdir`、`git`、`date`；不把 `jq`、`rsync` 或 GNU 专属扩展作为前置条件。
+1. 只依赖 Ubuntu 常见基础工具：`bash`、`basename`、`dirname`、`cp`、`mkdir`、`git`、`date`；不把 `jq`、`rsync` 或 GNU 专属扩展作为前置条件。
 2. 所有路径必须双引号包裹，支持空格；禁止 `eval` 和根据用户输入拼接可执行 shell 片段。
 3. `--dry-run` 不创建目录、不写文件、不执行 `git init`、不安装依赖。
 4. 非 `--force` 情况下不覆盖已存在文件；输出每个跳过或覆盖决定。
@@ -80,6 +83,9 @@ awz-workflow-v0.2.0/
 ├─ CHANGELOG.md
 ├─ LICENSE
 ├─ README.md
+├─ requirements/
+├─ style/
+├─ workflows/
 ├─ scripts/
 │  ├─ init-project.ps1
 │  ├─ init-project.sh
@@ -97,6 +103,20 @@ awz-workflow-v0.2.0/
 4. 解压后的临时目录中运行两端 smoke，不从源仓库借模板。
 5. 包内不含密钥、`.env`、本地 Agent 状态、`docs/`、`temp/` 或 `.git/`。
 6. 记录版本、commit SHA、打包时间和验证命令。
+
+打包入口默认拒绝 dirty worktree。仅为本地 smoke 时，可以显式使用 `-AllowDirty` 或 `--allow-dirty`；正式 release 禁止使用这个开关。
+
+Windows：
+
+```powershell
+.\scripts\package-release.ps1
+```
+
+Ubuntu/POSIX：
+
+```bash
+bash scripts/package-release.sh
+```
 
 通过后创建 Git tag，例如：
 
