@@ -1,5 +1,6 @@
 @echo off
 setlocal
+chcp 65001 >nul
 
 where pwsh.exe >nul 2>nul
 if %errorlevel% equ 0 (

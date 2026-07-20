@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$KeepArtifacts
 )
 
@@ -25,6 +25,18 @@ function Assert-True {
 
 try {
     & $tui --help | Out-Null
+
+    $demo = @(& $tui -RenderDemo)
+    $demoText = $demo -join "`n"
+    Assert-True ($demo.Count -eq 25) "Rendered TUI frame height changed unexpectedly"
+    Assert-True ($demo[0].StartsWith("╭") -and $demo[-1].StartsWith("╰")) "Rendered TUI frame borders are incomplete"
+    foreach ($token in @("AWZ WORKFLOW", "01 [模式]", "❯  创建新项目", "↑↓ 移动", "Enter 确认")) {
+        Assert-True $demoText.Contains($token) "Rendered TUI frame is missing: $token"
+    }
+
+    $batchDemo = @(& $batchTui -RenderDemo)
+    Assert-True ($LASTEXITCODE -eq 0) "BAT TUI demo render failed"
+    Assert-True (($batchDemo -join "`n").Contains("PROJECT CONTROL")) "BAT did not render the full-screen TUI frame"
 
     & $tui -Action init -TargetPath $dryRunPath -ProjectName "AWZ TUI DryRun" -DryRunOnly
     Assert-True (-not (Test-Path -LiteralPath $dryRunPath)) "PowerShell DryRunOnly created the target"
