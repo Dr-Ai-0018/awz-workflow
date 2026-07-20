@@ -63,6 +63,7 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 │  ├─ awz.bat
 │  ├─ awz.ps1
 │  ├─ awz.sh
+│  ├─ lib/AwzTui.psm1
 │  ├─ init-project.ps1
 │  ├─ init-project.bat
 │  ├─ init-project.sh
@@ -111,16 +112,23 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 
 ## 终端交互入口
 
-Windows 可以直接运行：
+Windows 推荐直接运行 BAT。它会使用 `-NoProfile` 启动 PowerShell，并进入全屏界面：
 
 ```powershell
 .\scripts\awz.bat
 ```
 
-或使用 PowerShell：
+从任意目录调用带空格的绝对路径时，PowerShell 必须使用 `&` 和引号：
+
+```powershell
+& 'E:\Project\AWZ Workflow\scripts\awz.bat'
+```
+
+也可以直接使用 PowerShell 脚本：
 
 ```powershell
 .\scripts\awz.ps1
+& 'E:\Project\AWZ Workflow\scripts\awz.ps1'
 ```
 
 Ubuntu/POSIX：
@@ -129,7 +137,7 @@ Ubuntu/POSIX：
 bash scripts/awz.sh
 ```
 
-TUI 会收集新项目/已有项目模式、目标路径与项目名，强制执行 DryRun，确认后才调用底层初始化器。自动化环境也可以传入完整参数和 `-Yes` / `--yes`，但不能跳过预览与底层安全检查。详细契约见 [TUI 与 CLI 工作流](workflows/tui.md)。
+Windows TUI 使用全屏边框布局、方向键选择、分步输入、可滚动 DryRun 预览、危险操作确认以及完成/错误页面。自动化环境也可以传入完整参数和 `-Yes` / `--yes`，但不能跳过预览与底层安全检查。详细契约见 [TUI 与 CLI 工作流](workflows/tui.md)。
 
 ## 硬边界
 
