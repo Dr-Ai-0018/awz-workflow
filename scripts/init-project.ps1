@@ -1,14 +1,49 @@
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$TargetPath,
+    [string]$TargetPath = "",
 
     [string]$ProjectName = "",
     [string]$Owner = "AWZ Workflow contributors",
+    [ValidateSet("New", "Existing")]
+    [string]$Mode = "New",
     [switch]$Force,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [Alias("h")]
+    [switch]$Help
 )
 
 $ErrorActionPreference = "Stop"
+
+function Show-Usage {
+    @"
+Usage:
+  .\scripts\init-project.ps1 -TargetPath <path> [options]
+
+Options:
+  -TargetPath <path>    Target project directory. Required.
+  -ProjectName <name>  Project name. Defaults to the target directory name.
+  -Owner <name>        MIT license owner. Defaults to AWZ Workflow contributors.
+  -Mode New            Default. Only initialize a missing or empty directory.
+  -Mode Existing       Explicitly add the baseline to an existing non-empty project.
+  -Force               Refresh AWZ-managed guidance files; valid only with -Mode Existing.
+                       Existing project-owned root files are never overwritten.
+  -DryRun              Preview changes without writing files or initializing Git.
+  -Help, -h, --help    Show this help message.
+"@
+}
+
+if ($Help -or $TargetPath -in @("--help", "-h")) {
+    Show-Usage
+    exit 0
+}
+
+if (-not $TargetPath) {
+    Show-Usage
+    throw "TargetPath is required."
+}
+
+if ($Force -and $Mode -ne "Existing") {
+    throw "Force is valid only with -Mode Existing. New-project mode never overwrites a non-empty target."
+}
 
 $root = Split-Path -Parent $PSScriptRoot
 $templateRoot = Join-Path $root "templates/project"
@@ -19,10 +54,11 @@ if (-not (Test-Path -LiteralPath $templateRoot)) {
 }
 
 $target = Get-Item -LiteralPath $TargetPath -Force -ErrorAction SilentlyContinue
+$targetNeedsCreation = $null -eq $target
 
-if ($null -eq $target) {
+if ($targetNeedsCreation) {
     $targetPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($TargetPath)
-    if ($DryRun) {
+    if ($DryRun -and $Mode -eq "New") {
         Write-Host "DryRun: target directory does not exist; would create $targetPath"
     }
 }
@@ -38,6 +74,26 @@ if ([string]::Equals($targetPath, $rootPath, [System.StringComparison]::OrdinalI
     throw "Target path cannot be the AWZ Workflow source directory: $rootPath"
 }
 
+if ($Mode -eq "Existing" -and $targetNeedsCreation) {
+    throw "Existing-project mode requires a directory that already exists: $targetPath"
+}
+
+if (-not $targetNeedsCreation) {
+    $existingEntries = @(Get-ChildItem -LiteralPath $targetPath -Force -ErrorAction Stop)
+    if ($Mode -eq "New" -and $existingEntries.Count -gt 0) {
+        $preview = ($existingEntries | Select-Object -First 10 -ExpandProperty Name) -join ", "
+        if ($existingEntries.Count -gt 10) {
+            $preview += ", ..."
+        }
+
+        throw "New-project mode refused non-empty target: $targetPath. Existing entries: $preview. Use a new/empty directory, or explicitly use -Mode Existing after reviewing a dry-run."
+    }
+}
+
+if ($Mode -eq "Existing") {
+    Write-Warning "Existing-project mode selected. Existing files are preserved unless -Force is also supplied."
+}
+
 $needsGitInit = -not (Test-Path -LiteralPath (Join-Path $targetPath ".git"))
 $gitAvailable = $null -ne (Get-Command git -ErrorAction SilentlyContinue)
 if ($needsGitInit -and (-not $gitAvailable)) {
@@ -47,11 +103,6 @@ if ($needsGitInit -and (-not $gitAvailable)) {
     else {
         throw "Git is required to initialize a new repository. Install Git, then run the initializer again."
     }
-}
-
-if (($null -eq $target) -and (-not $DryRun)) {
-    New-Item -ItemType Directory -Path $TargetPath | Out-Null
-    $targetPath = (Resolve-Path -LiteralPath $TargetPath).Path
 }
 
 $resolvedProjectName = if ($ProjectName) { $ProjectName } else { Split-Path -Leaf $targetPath }
@@ -76,11 +127,17 @@ function Write-GeneratedFile {
     param(
         [string]$SourceName,
         [string]$DestName,
-        [switch]$Render
+        [switch]$Render,
+        [switch]$ProtectInExisting
     )
 
     $dest = Join-Path $targetPath $DestName
     $destDir = Split-Path -Parent $dest
+
+    if ((Test-Path -LiteralPath $dest) -and $Mode -eq "Existing" -and $ProtectInExisting) {
+        Write-Host "Preserve existing project file: $DestName"
+        return
+    }
 
     if ((Test-Path -LiteralPath $dest) -and (-not $Force)) {
         Write-Host "Skip existing file: $DestName"
@@ -134,17 +191,13 @@ function Ensure-LocalDirectory {
 }
 
 $rootFiles = @(
-    @{ Source = "AGENTS.md"; Dest = "AGENTS.md"; Render = $false },
-    @{ Source = "CLAUDE.md"; Dest = "CLAUDE.md"; Render = $false },
-    @{ Source = "gitignore.template"; Dest = ".gitignore"; Render = $false },
-    @{ Source = "env.example"; Dest = ".env.example"; Render = $false },
-    @{ Source = "README.template.md"; Dest = "README.md"; Render = $true },
-    @{ Source = "LICENSE-MIT"; Dest = "LICENSE"; Render = $true }
+    @{ Source = "AGENTS.md"; Dest = "AGENTS.md"; Render = $false; ProtectInExisting = $false },
+    @{ Source = "CLAUDE.md"; Dest = "CLAUDE.md"; Render = $false; ProtectInExisting = $false },
+    @{ Source = "gitignore.template"; Dest = ".gitignore"; Render = $false; ProtectInExisting = $true },
+    @{ Source = "env.example"; Dest = ".env.example"; Render = $false; ProtectInExisting = $true },
+    @{ Source = "README.template.md"; Dest = "README.md"; Render = $true; ProtectInExisting = $true },
+    @{ Source = "LICENSE-MIT"; Dest = "LICENSE"; Render = $true; ProtectInExisting = $true }
 )
-
-foreach ($file in $rootFiles) {
-    Write-GeneratedFile -SourceName $file.Source -DestName $file.Dest -Render:([bool]$file.Render)
-}
 
 $localDirs = @(
     "docs",
@@ -163,10 +216,6 @@ $localDirs = @(
     "temp/experiments",
     "temp/logs"
 )
-
-foreach ($dir in $localDirs) {
-    Ensure-LocalDirectory $dir
-}
 
 $localFiles = @(
     @{ Source = "docs-layout.md"; Dest = "docs/README.md"; Render = $false },
@@ -187,6 +236,27 @@ $localFiles = @(
     @{ Source = "temp-layout.md"; Dest = "temp/README.md"; Render = $false }
 )
 
+# Validate the complete template set before creating the target or writing any file.
+foreach ($file in @($rootFiles) + @($localFiles)) {
+    $source = Join-Path $templateRoot $file.Source
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        throw "Template file not found: $($file.Source)"
+    }
+}
+
+if ($targetNeedsCreation -and (-not $DryRun)) {
+    New-Item -ItemType Directory -Path $TargetPath | Out-Null
+    $targetPath = (Resolve-Path -LiteralPath $TargetPath).Path
+}
+
+foreach ($file in $rootFiles) {
+    Write-GeneratedFile -SourceName $file.Source -DestName $file.Dest -Render:([bool]$file.Render) -ProtectInExisting:([bool]$file.ProtectInExisting)
+}
+
+foreach ($dir in $localDirs) {
+    Ensure-LocalDirectory $dir
+}
+
 foreach ($file in $localFiles) {
     Write-GeneratedFile -SourceName $file.Source -DestName $file.Dest -Render:([bool]$file.Render)
 }
@@ -206,5 +276,5 @@ if ($DryRun) {
     Write-Host "DryRun: preview complete; no files were written: $targetPath"
 }
 else {
-    Write-Host "AWZ project baseline initialized: $targetPath"
+    Write-Host "AWZ project baseline initialized in $Mode mode: $targetPath"
 }
