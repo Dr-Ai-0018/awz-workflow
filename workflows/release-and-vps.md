@@ -11,6 +11,7 @@
 当前正式版本具备：
 
 - Windows 初始化入口是 `scripts/init-project.ps1`；
+- Windows `cmd` 快捷入口是 `scripts/init-project.bat`，只转发到 PowerShell 实现；
 - Ubuntu/POSIX 初始化入口是 `scripts/init-project.sh`；
 - 两端都支持 dry-run、强制覆盖、UTF-8 模板渲染和 `git init -b main`；
 - Windows 与 POSIX 的 release 打包入口分别是 `package-release.ps1`、`package-release.sh`；
@@ -47,10 +48,13 @@ Windows 和 Linux 初始化器必须对齐这些语义：
 | 预演 | `-DryRun` | `--dry-run` |
 | 目标目录 | `-TargetPath` | `--target` |
 | 项目名 | `-ProjectName` | `--name` |
+| 初始化模式 | `-Mode New/Existing` | `--mode new/existing` |
 | 覆盖已有模板 | `-Force` | `--force` |
 | Git 默认分支 | `git init -b main` | `git init -b main` |
 | 模板编码 | UTF-8 | UTF-8 |
 | 不自动生成技术栈配置 | 保持 | 保持 |
+
+默认模式必须拒绝非空目标；force 只能与显式已有项目模式组合，不能绕过新项目安全检查，也不能覆盖已有项目的 `.gitignore`、`.env.example`、`README.md` 或 `LICENSE`。
 
 参数形式可以因 shell 习惯不同而不同，行为不能悄悄分叉。新增或修改模板后，要用同一个测试清单验证两个入口。
 
@@ -68,7 +72,7 @@ set -euo pipefail
 1. 只依赖 Ubuntu 常见基础工具：`bash`、`basename`、`dirname`、`cp`、`mkdir`、`git`、`date`；不把 `jq`、`rsync` 或 GNU 专属扩展作为前置条件。
 2. 所有路径必须双引号包裹，支持空格；禁止 `eval` 和根据用户输入拼接可执行 shell 片段。
 3. `--dry-run` 不创建目录、不写文件、不执行 `git init`、不安装依赖。
-4. 非 `--force` 情况下不覆盖已存在文件；输出每个跳过或覆盖决定。
+4. `new` 模式拒绝非空目标；`existing` 模式下非 `--force` 不覆盖已存在文件，并输出每个跳过或覆盖决定。
 5. 模板复制后保留 UTF-8；文本替换只能处理项目名、年份、owner 等固定占位符。
 6. 执行前明确检查 `git`；缺失时给出安装建议，但不擅自执行 `apt install`。
 7. `docs/`、`temp/`、根目录 `AGENTS.md`、`CLAUDE.md` 仍生成在项目中，但必须被新项目 `.gitignore` 忽略。
@@ -88,6 +92,7 @@ awz-workflow-v0.2.0/
 ├─ workflows/
 ├─ scripts/
 │  ├─ init-project.ps1
+│  ├─ init-project.bat
 │  ├─ init-project.sh
 │  ├─ package-release.ps1
 │  └─ package-release.sh
@@ -114,7 +119,7 @@ awz-workflow-v0.2.0/
 bash scripts/smoke-init-project.sh
 ```
 
-它覆盖 dry-run、`main` 初始化、忽略规则、重复运行、`--force`/`-Force`、非法文件目标和工作流源码目录保护；release 前的解压隔离 smoke 仍需单独执行。
+它覆盖 dry-run、`main` 初始化、忽略规则、非空目录拒绝、显式已有项目模式、`--force`/`-Force` 边界、BAT 参数转发、非法文件目标和工作流源码目录保护；release 前的解压隔离 smoke 仍需单独执行。
 
 打包入口默认拒绝 dirty worktree。仅为本地 smoke 时，可以显式使用 `-AllowDirty` 或 `--allow-dirty`；正式 release 禁止使用这个开关。
 
