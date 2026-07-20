@@ -10,6 +10,8 @@
 
 当前正式版本具备：
 
+- Windows 终端交互入口是 `scripts/awz.bat` / `scripts/awz.ps1`；
+- Ubuntu/POSIX 终端交互入口是 `scripts/awz.sh`；
 - Windows 初始化入口是 `scripts/init-project.ps1`；
 - Windows `cmd` 快捷入口是 `scripts/init-project.bat`，只转发到 PowerShell 实现；
 - Ubuntu/POSIX 初始化入口是 `scripts/init-project.sh`；
@@ -91,6 +93,9 @@ awz-workflow-v0.2.0/
 ├─ style/
 ├─ workflows/
 ├─ scripts/
+│  ├─ awz.bat
+│  ├─ awz.ps1
+│  ├─ awz.sh
 │  ├─ init-project.ps1
 │  ├─ init-project.bat
 │  ├─ init-project.sh
@@ -119,7 +124,17 @@ awz-workflow-v0.2.0/
 bash scripts/smoke-init-project.sh
 ```
 
-它覆盖 dry-run、`main` 初始化、忽略规则、非空目录拒绝、显式已有项目模式、`--force`/`-Force` 边界、BAT 参数转发、非法文件目标和工作流源码目录保护；release 前的解压隔离 smoke 仍需单独执行。
+TUI 入口变更后同时运行：
+
+```powershell
+.\scripts\smoke-awz-tui.ps1
+```
+
+```bash
+bash scripts/smoke-awz-tui.sh
+```
+
+初始化器 smoke 覆盖 dry-run、`main` 初始化、忽略规则、非空目录拒绝、显式已有项目模式、`--force`/`-Force` 边界、BAT 参数转发、非法文件目标和工作流源码目录保护。TUI smoke 覆盖强制预览、DryRunOnly、确认后执行、BAT 转发和非空目标拒绝；release 前的解压隔离 smoke 仍需单独执行。
 
 打包入口默认拒绝 dirty worktree。仅为本地 smoke 时，可以显式使用 `-AllowDirty` 或 `--allow-dirty`；正式 release 禁止使用这个开关。
 

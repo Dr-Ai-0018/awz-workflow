@@ -147,9 +147,11 @@ Node：
 - `init-project.ps1`：Windows 核心实现与稳定参数接口。
 - `init-project.sh`：Ubuntu/POSIX 核心实现，与 PowerShell 保持行为对齐。
 - `init-project.bat`：Windows 快捷入口，只负责选择 `pwsh`/Windows PowerShell 并转发参数，不复制初始化逻辑。
-- 后续 TUI：只负责收集目标路径、模式、项目名和确认信息；必须调用核心脚本的 DryRun/执行接口，不能另写一套文件生成逻辑。
+- `awz.bat` / `awz.ps1` / `awz.sh`：终端交互入口，只负责收集目标路径、模式、项目名和确认信息；必须调用核心脚本的 DryRun/执行接口，不能另写一套文件生成逻辑。
 
 后续新增 refresh、模板升级、差异预览或技术栈选择时，应使用独立 subcommand/脚本和 manifest，不要继续扩大 `init` 的覆盖权限。
+
+完整交互与脚本化调用契约见 `workflows/tui.md`。
 
 ## 规模判断
 

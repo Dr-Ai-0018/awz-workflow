@@ -37,6 +37,7 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 - 代码架构和文件复杂度基线；
 - 前端 UI 质量底线；
 - 新项目模板和初始化脚本。
+- 无第三方依赖的 Windows/POSIX 终端交互入口。
 
 它暂时不追求成为完整脚手架、CI 平台或文档站。
 
@@ -52,15 +53,21 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 │  ├─ project-initialization.md
 │  ├─ review-and-fix.md
 │  ├─ release-and-vps.md
+│  ├─ tui.md
 │  └─ verification-baseline.md
 ├─ style/
 │  ├─ code-architecture-baseline.md
 │  ├─ frontend-baseline.md
 │  └─ git-style.md
 ├─ scripts/
+│  ├─ awz.bat
+│  ├─ awz.ps1
+│  ├─ awz.sh
 │  ├─ init-project.ps1
 │  ├─ init-project.bat
 │  ├─ init-project.sh
+│  ├─ smoke-awz-tui.ps1
+│  ├─ smoke-awz-tui.sh
 │  ├─ smoke-init-project.ps1
 │  ├─ smoke-init-project.sh
 │  ├─ package-release.ps1
@@ -101,6 +108,28 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 当前发布版本由 `VERSION` 管理。Windows 使用 `scripts/init-project.ps1`，也可通过薄封装 `scripts/init-project.bat` 从 `cmd` 调用；Ubuntu/POSIX 使用 `scripts/init-project.sh`。默认新项目模式只接受不存在或空目录，已有项目必须显式选择 `Existing` 模式；两端都先运行 dry-run，再进行真实初始化。跨平台 release 包和 VPS 使用方式见 [Release 与 VPS 初始化工作流](workflows/release-and-vps.md)。每个正式 tag 都必须经过两端初始化器、解压隔离 smoke 和 release 包验证。
 
 模板或初始化器变更后，先运行对应平台的轻量回归 smoke：`./scripts/smoke-init-project.ps1` 或 `bash scripts/smoke-init-project.sh`。它只验证初始化器本身，不替代 release 前的解压隔离 smoke。
+
+## 终端交互入口
+
+Windows 可以直接运行：
+
+```powershell
+.\scripts\awz.bat
+```
+
+或使用 PowerShell：
+
+```powershell
+.\scripts\awz.ps1
+```
+
+Ubuntu/POSIX：
+
+```bash
+bash scripts/awz.sh
+```
+
+TUI 会收集新项目/已有项目模式、目标路径与项目名，强制执行 DryRun，确认后才调用底层初始化器。自动化环境也可以传入完整参数和 `-Yes` / `--yes`，但不能跳过预览与底层安全检查。详细契约见 [TUI 与 CLI 工作流](workflows/tui.md)。
 
 ## 硬边界
 
