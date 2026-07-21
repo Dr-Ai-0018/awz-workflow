@@ -1,6 +1,48 @@
 # 项目初始化工作流
 
-用于新项目启动，或把已有项目整理到 AWZ Workflow 基线。
+用于安全启动新项目。已有项目接入 AWZ Workflow 时必须显式进入 `Existing` 模式，不能与新项目初始化共用默认行为。
+
+## 初始化模式与安全边界
+
+初始化器提供两个语义严格分离的模式：
+
+| 模式 | PowerShell | POSIX | 允许的目标 |
+| --- | --- | --- | --- |
+| 新项目（默认） | `-Mode New` | `--mode new` | 不存在或完全为空的目录 |
+| 已有项目（显式） | `-Mode Existing` | `--mode existing` | 已存在的目录 |
+
+硬边界：
+
+1. 默认 `New` 模式遇到任何已有条目都必须在写入前失败，包括隐藏文件、`.git/`、旧 `.env` 和旧工程文件。
+2. `-Force` / `--force` 不能绕过 `New` 模式，只能与显式 `Existing` 模式组合使用。
+3. `Existing` 模式默认保留已有文件，只补充缺失基线；force 只刷新 AWZ 管理的本地指导文件。
+4. 已有项目的 `.gitignore`、`.env.example`、`README.md`、`LICENSE` 永远视为项目自有文件，即使指定 force 也不能覆盖。
+5. `Existing` 模式不能指向不存在的目录，避免把参数写错后静默创建成新项目。
+6. 所有模板、目标类型、模式和 `git` 前置条件必须在首次写入前完成校验。
+7. 执行已有项目模式前必须先跑 DryRun，并 review 将写入、跳过或覆盖的清单。
+
+默认新项目示例：
+
+```powershell
+.\scripts\init-project.ps1 -TargetPath 'E:\Project\Example' -ProjectName 'Example' -DryRun
+.\scripts\init-project.ps1 -TargetPath 'E:\Project\Example' -ProjectName 'Example'
+```
+
+Windows `cmd` / BAT 入口复用同一份 PowerShell 核心逻辑：
+
+```bat
+scripts\init-project.bat -TargetPath "E:\Project\Example" -ProjectName "Example" -DryRun
+scripts\init-project.bat -TargetPath "E:\Project\Example" -ProjectName "Example"
+```
+
+已有项目示例：
+
+```powershell
+.\scripts\init-project.ps1 -TargetPath 'E:\Project\Existing' -Mode Existing -DryRun
+.\scripts\init-project.ps1 -TargetPath 'E:\Project\Existing' -Mode Existing
+```
+
+不要在未 review DryRun 的情况下给已有项目追加 `-Force`。
 
 ## 必需基线
 
@@ -20,7 +62,7 @@
 
 注意：`AGENTS.md` 和 `CLAUDE.md` 会生成在项目根目录，方便本地 Agent 读取，但默认不进 git。
 
-初始化器只接受目录目标，且不允许把 AWZ Workflow 自身源码目录作为目标。需要新建 git 仓库时，必须在任何文件或目录写入前确认 `git` 可用；缺失时直接报错，不留下半成品基线。
+初始化器只接受目录目标，且不允许把 AWZ Workflow 自身源码目录作为目标。需要新建 git 仓库时，必须在任何文件或目录写入前确认 `git` 可用；缺失时直接报错，不留下半成品基线。不能把“跳过同名文件”等同于“对已有项目安全”，因为新增 README、LICENSE、Agent 规则或目录同样会污染旧项目。
 
 ## 忽略规则
 
@@ -86,6 +128,7 @@ Node：
 - 将写入哪些文件；
 - 将创建哪些目录；
 - 哪些文件已存在，会跳过还是被 `-Force` 覆盖；
+- 目标目录是否因模式不匹配而被拒绝；
 - 是否会执行 `git init -b main`；
 - 哪些配置因为项目规模或技术栈不足而故意不生成。
 
@@ -98,6 +141,17 @@ Node：
 - 修改用户环境。
 
 `DryRun` 不是测试。它只是变更预演。真实验证仍要用 smoke/test/check。
+
+## CLI、BAT 与后续 TUI 分层
+
+- `init-project.ps1`：Windows 核心实现与稳定参数接口。
+- `init-project.sh`：Ubuntu/POSIX 核心实现，与 PowerShell 保持行为对齐。
+- `init-project.bat`：Windows 快捷入口，只负责选择 `pwsh`/Windows PowerShell 并转发参数，不复制初始化逻辑。
+- `awz.bat` / `awz.ps1` / `awz.sh`：终端交互入口，只负责收集目标路径、模式、项目名和确认信息；必须调用核心脚本的 DryRun/执行接口，不能另写一套文件生成逻辑。
+
+后续新增 refresh、模板升级、差异预览或技术栈选择时，应使用独立 subcommand/脚本和 manifest，不要继续扩大 `init` 的覆盖权限。
+
+完整交互与脚本化调用契约见 `workflows/tui.md`。
 
 ## 规模判断
 

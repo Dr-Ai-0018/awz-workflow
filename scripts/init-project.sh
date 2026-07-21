@@ -10,7 +10,10 @@ Options:
   --target <path>   Target project directory. Required.
   --name <name>     Project name. Defaults to the target directory name.
   --owner <name>    MIT license owner. Defaults to AWZ Workflow contributors.
-  --force           Overwrite generated files that already exist.
+  --mode new        Default. Only initialize a missing or empty directory.
+  --mode existing   Explicitly add the baseline to an existing non-empty project.
+  --force           Refresh AWZ-managed guidance files; valid only with --mode existing.
+                    Existing project-owned root files are never overwritten.
   --dry-run         Preview changes without writing files or initializing Git.
   -h, --help        Show this help message.
 EOF
@@ -28,6 +31,7 @@ template_root="$root/templates/project"
 target_input=''
 project_name=''
 owner='AWZ Workflow contributors'
+mode='new'
 force=false
 dry_run=false
 
@@ -46,6 +50,11 @@ while (($# > 0)); do
         --owner)
             (($# >= 2)) || die '--owner requires a value.'
             owner=$2
+            shift 2
+            ;;
+        --mode)
+            (($# >= 2)) || die '--mode requires new or existing.'
+            mode=$2
             shift 2
             ;;
         --force)
@@ -68,6 +77,10 @@ done
 
 [[ -n "$target_input" ]] || die '--target is required.'
 [[ -d "$template_root" ]] || die "Template directory not found: $template_root"
+[[ "$mode" == 'new' || "$mode" == 'existing' ]] || die '--mode must be new or existing.'
+if [[ "$force" == true && "$mode" != 'existing' ]]; then
+    die '--force is valid only with --mode existing. New-project mode never overwrites a non-empty target.'
+fi
 
 if [[ -e "$target_input" && ! -d "$target_input" ]]; then
     die "Target path is not a directory: $target_input"
@@ -83,12 +96,38 @@ if [[ -d "$target_input" ]]; then
 else
     target_path=$target_input
     target_needs_creation=true
-    if [[ "$dry_run" == true ]]; then
+    if [[ "$dry_run" == true && "$mode" == 'new' ]]; then
         printf 'DryRun: target directory does not exist; would create %s\n' "$target_path"
     fi
 fi
 
 [[ "$target_path" != "$root" ]] || die "Target path cannot be the AWZ Workflow source directory: $root"
+
+if [[ "$mode" == 'existing' && "$target_needs_creation" == true ]]; then
+    die "Existing-project mode requires a directory that already exists: $target_path"
+fi
+
+if [[ "$target_needs_creation" != true ]]; then
+    shopt -s nullglob dotglob
+    target_entries=("$target_path"/*)
+    shopt -u nullglob dotglob
+    if [[ "$mode" == 'new' && ${#target_entries[@]} -gt 0 ]]; then
+        entry_preview=''
+        preview_count=${#target_entries[@]}
+        ((preview_count > 10)) && preview_count=10
+        for ((i = 0; i < preview_count; i++)); do
+            entry_name=$(basename "${target_entries[$i]}")
+            [[ -z "$entry_preview" ]] || entry_preview+=', '
+            entry_preview+=$entry_name
+        done
+        ((${#target_entries[@]} <= 10)) || entry_preview+=', ...'
+        die "New-project mode refused non-empty target: $target_path. Existing entries: $entry_preview. Use a new/empty directory, or explicitly use --mode existing after reviewing a dry-run."
+    fi
+fi
+
+if [[ "$mode" == 'existing' ]]; then
+    printf '%s\n' 'Warning: Existing-project mode selected. Existing files are preserved unless --force is also supplied.' >&2
+fi
 
 needs_git_init=false
 if [[ ! -d "$target_path/.git" ]]; then
@@ -101,11 +140,6 @@ if [[ "$needs_git_init" == true ]] && ! command -v git >/dev/null 2>&1; then
     else
         die 'Git is required to initialize a new repository. Install Git, then run the initializer again.'
     fi
-fi
-
-if [[ "$target_needs_creation" == true && "$dry_run" != true ]]; then
-    mkdir -p "$target_input"
-    target_path=$(cd "$target_input" && pwd -P)
 fi
 
 current_year=$(date +%Y)
@@ -125,10 +159,16 @@ write_generated_file() {
     local source_name=$1
     local dest_name=$2
     local render=$3
+    local protect_in_existing=${4:-false}
     local source="$template_root/$source_name"
     local dest="$target_path/$dest_name"
 
     [[ -f "$source" ]] || die "Template file not found: $source_name"
+
+    if [[ -e "$dest" && "$mode" == 'existing' && "$protect_in_existing" == true ]]; then
+        printf 'Preserve existing project file: %s\n' "$dest_name"
+        return
+    fi
 
     if [[ -e "$dest" && "$force" != true ]]; then
         printf 'Skip existing file: %s\n' "$dest_name"
@@ -169,18 +209,13 @@ ensure_local_directory() {
 }
 
 root_files=(
-    'AGENTS.md|AGENTS.md|false'
-    'CLAUDE.md|CLAUDE.md|false'
-    'gitignore.template|.gitignore|false'
-    'env.example|.env.example|false'
-    'README.template.md|README.md|true'
-    'LICENSE-MIT|LICENSE|true'
+    'AGENTS.md|AGENTS.md|false|false'
+    'CLAUDE.md|CLAUDE.md|false|false'
+    'gitignore.template|.gitignore|false|true'
+    'env.example|.env.example|false|true'
+    'README.template.md|README.md|true|true'
+    'LICENSE-MIT|LICENSE|true|true'
 )
-
-for file in "${root_files[@]}"; do
-    IFS='|' read -r source dest render <<< "$file"
-    write_generated_file "$source" "$dest" "$render"
-done
 
 local_dirs=(
     'docs'
@@ -199,10 +234,6 @@ local_dirs=(
     'temp/experiments'
     'temp/logs'
 )
-
-for dir in "${local_dirs[@]}"; do
-    ensure_local_directory "$dir"
-done
 
 local_files=(
     'docs-layout.md|docs/README.md|false'
@@ -223,6 +254,26 @@ local_files=(
     'temp-layout.md|temp/README.md|false'
 )
 
+# Validate the complete template set before creating the target or writing any file.
+for file in "${root_files[@]}" "${local_files[@]}"; do
+    IFS='|' read -r source _ _ _ <<< "$file"
+    [[ -f "$template_root/$source" ]] || die "Template file not found: $source"
+done
+
+if [[ "$target_needs_creation" == true && "$dry_run" != true ]]; then
+    mkdir -p "$target_input"
+    target_path=$(cd "$target_input" && pwd -P)
+fi
+
+for file in "${root_files[@]}"; do
+    IFS='|' read -r source dest render protect_in_existing <<< "$file"
+    write_generated_file "$source" "$dest" "$render" "$protect_in_existing"
+done
+
+for dir in "${local_dirs[@]}"; do
+    ensure_local_directory "$dir"
+done
+
 for file in "${local_files[@]}"; do
     IFS='|' read -r source dest render <<< "$file"
     write_generated_file "$source" "$dest" "$render"
@@ -241,5 +292,5 @@ if [[ "$dry_run" == true ]]; then
     printf '%s\n' 'DryRun: will not generate pyproject.toml, package.json, Docker, CI, or deployment config unless a matching project type is chosen later.'
     printf 'DryRun: preview complete; no files were written: %s\n' "$target_path"
 else
-    printf 'AWZ project baseline initialized: %s\n' "$target_path"
+    printf 'AWZ project baseline initialized in %s mode: %s\n' "$mode" "$target_path"
 fi
