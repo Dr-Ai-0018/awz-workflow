@@ -55,6 +55,12 @@ review、audit、debug、hardening：
 - `style/frontend-baseline.md`
 - `workflows/verification-baseline.md`
 
+第三方参考源码、方案借鉴、AI context：
+
+- `.awz/references.json`
+- `docs/agent-room/reference-context.md`（存在时）
+- `workflows/reference-library.md`
+
 需求、偏好、边界规则不确定：
 
 - `requirements/awz-workflow-v0.1.md`

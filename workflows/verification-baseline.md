@@ -176,6 +176,16 @@ URL：`http://localhost:8080/?search=<QUERY>&json=1&count=<N>[&path_column=1&siz
 - 默认不索引文件**内容**（只有名字、路径、元数据）；`content:` 语法需要用户在 UI 里手动打开内容索引，默认视为不支持。
 - 索引经内核 raw volume 读取，包含普通 PS 因 ACL 看不到的路径。这是能力优势，但意味着结果可能大于/不同于用户态遍历。
 
+## Reference Library 验证
+
+参考项目库默认使用离线检查：
+
+1. `status` 检查配置、catalog、repo、revision、dirty state 和项目 mapping。
+2. `doctor` 进行严格检查，存在错误时返回非零。
+3. `add --dry-run`、`configure --dry-run` 不创建目录、不写配置、不 clone。
+4. smoke 必须使用隔离的 `AWZ_CONFIG_DIR` 和本地 Git fixture，不得访问公网或真实参考库。
+5. Reference Library 不可用不能破坏核心项目初始化。
+
 ## 测试目录
 
 验证初始化脚本、生成器或一次性输出时，默认使用本项目的 `temp/` 目录。

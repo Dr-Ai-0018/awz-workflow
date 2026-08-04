@@ -55,12 +55,15 @@ scripts\init-project.bat -TargetPath "E:\Project\Example" -ProjectName "Example"
 - 本地 ignored `CLAUDE.md`，并导入 `AGENTS.md`；
 - 本地 ignored `docs/`；
 - 本地 ignored `temp/`；
+- 可提交 `.awz/references.json`，默认没有任何映射；
 - license，默认 MIT；
 - README，包含 quickstart 和常用命令。
 
 注意：必需基线不包含 `pyproject.toml`、`package.json`、Docker、CI 或部署配置。
 
 注意：`AGENTS.md` 和 `CLAUDE.md` 会生成在项目根目录，方便本地 Agent 读取，但默认不进 git。
+
+`.awz/references.json` 只声明项目使用哪些 reference id，不保存本机参考库绝对路径。初始化器不会创建外部参考库、修改机器级配置、联网或 clone；参考库生命周期使用独立 `reference` 命令，详见 `workflows/reference-library.md`。
 
 初始化器只接受目录目标，且不允许把 AWZ Workflow 自身源码目录作为目标。需要新建 git 仓库时，必须在任何文件或目录写入前确认 `git` 可用；缺失时直接报错，不留下半成品基线。不能把“跳过同名文件”等同于“对已有项目安全”，因为新增 README、LICENSE、Agent 规则或目录同样会污染旧项目。
 
@@ -138,7 +141,8 @@ Node：
 - 写入文件；
 - 初始化 git；
 - 安装依赖；
-- 修改用户环境。
+- 修改用户环境；
+- 创建、clone 或更新 Reference Library。
 
 `DryRun` 不是测试。它只是变更预演。真实验证仍要用 smoke/test/check。
 
@@ -215,9 +219,10 @@ tests/
 2. 确认 ignored 路径没有被 staged。
 3. 确认 `AGENTS.md`、`CLAUDE.md`、`docs/`、`temp/` 不会被 git 看到。
 4. 确认 `.env.example` 能被 git 看到。
-5. 确认 `docs/agent-room/status.md` 已生成。
-6. 确认 `docs/README.md`、`temp/README.md`、agent onboarding、分层 guides、review/release/handoff/decision 模板已生成到 ignored 本地工作区。
-7. 运行最小可用 smoke command。
-8. 总结已经生成什么，以及哪些东西是故意没生成。
+5. 确认 `.awz/references.json` 能被 git 看到，且已有项目中的同名文件不会被 force 覆盖。
+6. 确认 `docs/agent-room/status.md` 已生成。
+7. 确认 `docs/README.md`、`temp/README.md`、agent onboarding、分层 guides、review/release/handoff/decision 模板已生成到 ignored 本地工作区。
+8. 运行最小可用 smoke command。
+9. 总结已经生成什么，以及哪些东西是故意没生成。
 
 详见 `workflows/verification-baseline.md`。

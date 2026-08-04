@@ -15,6 +15,7 @@
 - Windows 初始化入口是 `scripts/init-project.ps1`；
 - Windows `cmd` 快捷入口是 `scripts/init-project.bat`，只转发到 PowerShell 实现；
 - Ubuntu/POSIX 初始化入口是 `scripts/init-project.sh`；
+- 可选 Reference Library 入口是 `scripts/reference-library.ps1` / `scripts/reference-library.sh`，共享 Python 标准库核心；
 - 两端都支持 dry-run、强制覆盖、UTF-8 模板渲染和 `git init -b main`；
 - Windows 与 POSIX 的 release 打包入口分别是 `package-release.ps1`、`package-release.sh`；
 - Windows PowerShell 与真实 Ubuntu VPS 的 dry-run、真实初始化和解压隔离 smoke 均已验证。
@@ -73,11 +74,13 @@ set -euo pipefail
 
 1. 只依赖 Ubuntu 常见基础工具：`bash`、`basename`、`dirname`、`cp`、`mkdir`、`git`、`date`；不把 `jq`、`rsync` 或 GNU 专属扩展作为前置条件。
 2. 所有路径必须双引号包裹，支持空格；禁止 `eval` 和根据用户输入拼接可执行 shell 片段。
-3. `--dry-run` 不创建目录、不写文件、不执行 `git init`、不安装依赖。
-4. `new` 模式拒绝非空目标；`existing` 模式下非 `--force` 不覆盖已存在文件，并输出每个跳过或覆盖决定。
-5. 模板复制后保留 UTF-8；文本替换只能处理项目名、年份、owner 等固定占位符。
-6. 执行前明确检查 `git`；缺失时给出安装建议，但不擅自执行 `apt install`。
-7. `docs/`、`temp/`、根目录 `AGENTS.md`、`CLAUDE.md` 仍生成在项目中，但必须被新项目 `.gitignore` 忽略。
+3. 仓库通过 `.gitattributes` 强制 `*.sh` 使用 LF，Windows checkout 也必须能被 WSL/Ubuntu 直接执行。
+4. `--dry-run` 不创建目录、不写文件、不执行 `git init`、不安装依赖。
+5. `new` 模式拒绝非空目标；`existing` 模式下非 `--force` 不覆盖已存在文件，并输出每个跳过或覆盖决定。
+6. 模板复制后保留 UTF-8；文本替换只能处理项目名、年份、owner 等固定占位符。
+7. 执行前明确检查 `git`；缺失时给出安装建议，但不擅自执行 `apt install`。
+8. `docs/`、`temp/`、根目录 `AGENTS.md`、`CLAUDE.md` 仍生成在项目中，但必须被新项目 `.gitignore` 忽略。
+9. `.awz/references.json` 保持可提交；初始化时不联网、不 clone，也不要求 Python。
 
 ## Release 包格式
 
@@ -99,6 +102,9 @@ awz-workflow-v0.2.0/
 │  ├─ init-project.ps1
 │  ├─ init-project.bat
 │  ├─ init-project.sh
+│  ├─ reference-library.py
+│  ├─ reference-library.ps1
+│  ├─ reference-library.sh
 │  ├─ package-release.ps1
 │  └─ package-release.sh
 └─ templates/
@@ -113,6 +119,7 @@ awz-workflow-v0.2.0/
 4. 解压后的临时目录中运行两端 smoke，不从源仓库借模板。
 5. 包内不含密钥、`.env`、本地 Agent 状态、`docs/`、`temp/` 或 `.git/`。
 6. 记录版本、commit SHA、打包时间和验证命令。
+7. 包内不含 reference repos、机器级 reference 配置、context cache 或 reference logs。
 
 模板或初始化器变更后，先运行对应平台的轻量回归 smoke：
 
@@ -135,6 +142,8 @@ bash scripts/smoke-awz-tui.sh
 ```
 
 初始化器 smoke 覆盖 dry-run、`main` 初始化、忽略规则、非空目录拒绝、显式已有项目模式、`--force`/`-Force` 边界、BAT 参数转发、非法文件目标和工作流源码目录保护。TUI smoke 覆盖强制预览、DryRunOnly、确认后执行、BAT 转发和非空目标拒绝；release 前的解压隔离 smoke 仍需单独执行。
+
+Reference Library 变更同时运行 `smoke-reference-library.ps1` / `smoke-reference-library.sh`；smoke 使用本地 fixture，不访问公网。
 
 打包入口默认拒绝 dirty worktree。仅为本地 smoke 时，可以显式使用 `-AllowDirty` 或 `--allow-dirty`；正式 release 禁止使用这个开关。
 
@@ -190,7 +199,7 @@ git status --short
 git status --ignored --short AGENTS.md CLAUDE.md docs temp
 ```
 
-预期：`.env.example`、`.gitignore`、`README.md`、`LICENSE` 可以被 git 看到；`AGENTS.md`、`CLAUDE.md`、`docs/`、`temp/` 显示为 ignored，不参与提交。
+预期：`.env.example`、`.gitignore`、`.awz/references.json`、`README.md`、`LICENSE` 可以被 git 看到；`AGENTS.md`、`CLAUDE.md`、`docs/`、`temp/` 显示为 ignored，不参与提交。
 
 业务项目是否添加 `pyproject.toml`、`package.json`、Docker、CI、部署配置，仍由项目技术栈与规模决定，不由初始化器代替决策。
 

@@ -39,6 +39,7 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 - 前端 UI 质量底线；
 - 新项目模板和初始化脚本。
 - 无第三方依赖的 Windows/POSIX 终端交互入口。
+- 位于业务项目之外、可跨项目映射的 Reference Library。
 
 它暂时不追求成为完整脚手架、CI 平台或文档站。
 
@@ -53,6 +54,7 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 │  ├─ room-ledger.md
 │  ├─ agent-onboarding.md
 │  ├─ project-initialization.md
+│  ├─ reference-library.md
 │  ├─ review-and-fix.md
 │  ├─ release-and-vps.md
 │  ├─ tui.md
@@ -69,10 +71,15 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 │  ├─ init-project.ps1
 │  ├─ init-project.bat
 │  ├─ init-project.sh
+│  ├─ reference-library.py
+│  ├─ reference-library.ps1
+│  ├─ reference-library.sh
 │  ├─ smoke-awz-tui.ps1
 │  ├─ smoke-awz-tui.sh
 │  ├─ smoke-init-project.ps1
 │  ├─ smoke-init-project.sh
+│  ├─ smoke-reference-library.ps1
+│  ├─ smoke-reference-library.sh
 │  ├─ room-ledger.py
 │  ├─ smoke-room-ledger.py
 │  ├─ package-release.ps1
@@ -94,6 +101,7 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
       ├─ docs-layout.md
       ├─ review-checklist.template.md
       ├─ release-checklist.template.md
+      ├─ references.json
       └─ temp-layout.md
 ```
 
@@ -114,6 +122,12 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 当前发布版本由 `VERSION` 管理。Windows 使用 `scripts/init-project.ps1`，也可通过薄封装 `scripts/init-project.bat` 从 `cmd` 调用；Ubuntu/POSIX 使用 `scripts/init-project.sh`。默认新项目模式只接受不存在或空目录，已有项目必须显式选择 `Existing` 模式；两端都先运行 dry-run，再进行真实初始化。跨平台 release 包和 VPS 使用方式见 [Release 与 VPS 初始化工作流](workflows/release-and-vps.md)。每个正式 tag 都必须经过两端初始化器、解压隔离 smoke 和 release 包验证。
 
 模板或初始化器变更后，先运行对应平台的轻量回归 smoke：`./scripts/smoke-init-project.ps1` 或 `bash scripts/smoke-init-project.sh`。它只验证初始化器本身，不替代 release 前的解压隔离 smoke。
+
+## 参考项目库
+
+Reference Library 把 GSAP 这类长期参考源码放在业务项目之外，通过可提交的 `.awz/references.json` 映射给具体项目。Windows 默认优先 `D:\AWZ References`，没有 D 盘时回退 `%USERPROFILE%\AWZ References`；本机可以显式配置其他位置。
+
+初始化器只生成空 mapping 和阅读说明，不联网、不 clone。参考库的 configure、add、map、context 和 doctor 使用独立命令，详见 [参考项目库工作流](workflows/reference-library.md)。
 
 ## 终端交互入口
 
