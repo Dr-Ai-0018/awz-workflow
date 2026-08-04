@@ -7,6 +7,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $tui = Join-Path $PSScriptRoot "awz.ps1"
 $batchTui = Join-Path $PSScriptRoot "awz.bat"
+$tuiModule = Join-Path $PSScriptRoot "lib/AwzTui.psm1"
 $dryRunPath = Join-Path $root ("temp/smoke-tui-dryrun-" + [guid]::NewGuid().ToString("N"))
 $batchDryRunPath = Join-Path $root ("temp/smoke-tui-bat-" + [guid]::NewGuid().ToString("N"))
 $applyPath = Join-Path $root ("temp/smoke-tui-apply-" + [guid]::NewGuid().ToString("N"))
@@ -26,11 +27,17 @@ function Assert-True {
 try {
     & $tui --help | Out-Null
 
+    $tuiModuleSource = Get-Content -LiteralPath $tuiModule -Raw
+    Assert-True $tuiModuleSource.Contains("Read-Host") "Terminal wizard must use native line editing for text input"
+    Assert-True (-not $tuiModuleSource.Contains("[Console]::ReadKey")) "Terminal wizard must not redraw the full screen for every keypress"
+    Assert-True $tuiModuleSource.Contains("function Show-AwzTuiLog") "Terminal wizard must retain a dedicated activity-log view"
+    Assert-True $tuiModuleSource.Contains('Start-Sleep -Seconds $PauseSeconds') "Activity logs must remain visible before the next view replaces them"
+
     $demo = @(& $tui -RenderDemo)
     $demoText = $demo -join "`n"
-    Assert-True ($demo.Count -eq 25) "Rendered TUI frame height changed unexpectedly"
+    Assert-True ($demo.Count -eq 19) "Rendered terminal wizard frame height changed unexpectedly"
     Assert-True ($demo[0].StartsWith("╭") -and $demo[-1].StartsWith("╰")) "Rendered TUI frame borders are incomplete"
-    foreach ($token in @("AWZ WORKFLOW", "01 [模式]", "❯  创建新项目", "↑↓ 移动", "Enter 确认")) {
+    foreach ($token in @("AWZ WORKFLOW", "01 [模式]", "[1]  创建新项目", "[2]  接入已有项目", "输入编号")) {
         Assert-True $demoText.Contains($token) "Rendered TUI frame is missing: $token"
     }
 

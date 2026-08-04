@@ -19,9 +19,9 @@ Import-Module $tuiModule -Force -ErrorAction Stop
 
 function Show-Usage {
     @"
-AWZ Workflow TUI
+AWZ Workflow Terminal Wizard
 
-Interactive full-screen TUI:
+Interactive terminal wizard:
   .\scripts\awz.bat
   .\scripts\awz.ps1
 
@@ -40,7 +40,7 @@ Options:
   -Force               Refresh AWZ-managed files in Existing mode.
   -DryRunOnly          Stop after the mandatory preview.
   -Yes                  Apply after preview without an interactive confirmation.
-  -Classic              Use line-oriented prompts instead of the full-screen TUI.
+  -Classic              Use the minimal line-oriented prompt flow.
   -RenderDemo           Print a deterministic visual frame for preview/testing.
   -Help, -h, --help    Show this help message.
 
@@ -174,14 +174,10 @@ function Invoke-ScriptedFlow {
     }
 }
 
-function Invoke-FullScreenTui {
+function Invoke-TerminalWizard {
     param([string]$InitializerPath)
 
-    $oldCursorVisible = $true
     try {
-        $oldCursorVisible = [Console]::CursorVisible
-        [Console]::CursorVisible = $false
-
         $selectedMode = Select-AwzTuiOption -Title "选择工作模式" -Subtitle "新项目与已有项目采用完全不同的安全边界" -Step "01 [模式]  ───   02  信息   ───   03  预览   ───   04  执行" -Options @(
             [pscustomobject]@{ Label = "创建新项目"; Description = "仅允许不存在或完全为空的目标目录"; Value = "New" },
             [pscustomobject]@{ Label = "接入已有项目"; Description = "显式保留项目自有文件，只补充 AWZ 基线"; Value = "Existing" }
@@ -212,6 +208,7 @@ function Invoke-FullScreenTui {
         $params = New-InitParams -Target $target -Project $project -LicenseOwner $licenseOwner -SelectedMode $selectedMode -Refresh $refresh
         Show-AwzTuiFrame -Title "正在生成变更计划" -Subtitle "只读检查，不会创建或修改文件" -Content @("", "                 ◇  ANALYZING TARGET", "", "                 检查目录、模板与 Git 前置条件…") -Step "01  模式   ───   02  信息   ───   03 [预览]  ───   04  执行" -Footer "请稍候"
         $preview = @(& $InitializerPath @params -DryRun 2>&1 | ForEach-Object { $_.ToString() })
+        Show-AwzTuiLog -Title "DryRun 检查完成" -Subtitle "以下是将要发生的全部变更" -Lines $preview -Step "01  模式   ───   02  信息   ───   03 [预览]  ───   04  执行"
         $apply = Show-AwzTuiPreview -PreviewLines $preview -Target $target -Project $project -SelectedMode $selectedMode -Refresh $refresh
         if (-not $apply) { return }
 
@@ -222,6 +219,7 @@ function Invoke-FullScreenTui {
 
         Show-AwzTuiFrame -Title "正在应用" -Subtitle "底层初始化器正在执行已预览的计划" -Content @("", "                 ◆  APPLYING BASELINE", "", "                 写入模板并验证 Git 状态…") -Step "01  模式   ───   02  信息   ───   03  预览   ───   04 [执行]" -Footer "请勿关闭终端"
         $applyOutput = @(& $InitializerPath @params 2>&1 | ForEach-Object { $_.ToString() })
+        Show-AwzTuiLog -Title "初始化已执行" -Subtitle "以下是本次实际写入与创建的结果" -Lines $applyOutput -Step "01  模式   ───   02  信息   ───   03  预览   ───   04 [执行]"
         $gitStatus = @()
         if (Test-Path -LiteralPath (Join-Path $target ".git")) {
             $gitStatus = @(& git -C $target status --short 2>&1 | ForEach-Object { $_.ToString() })
@@ -236,22 +234,13 @@ function Invoke-FullScreenTui {
             "",
             "下一步：进入项目目录并检查 git status"
         )
-        Show-AwzTuiFrame -Title "项目已准备就绪" -Subtitle "AWZ Workflow baseline applied successfully" -Content $content -Step "01  模式   ───   02  信息   ───   03  预览   ───   04 [完成]" -Footer "Enter / Q 返回终端"
-        while ($true) {
-            $key = [Console]::ReadKey($true)
-            if ($key.Key -in @("Enter", "Q", "Escape")) { break }
-        }
+        Show-AwzTuiFrame -Title "项目已准备就绪" -Subtitle "AWZ Workflow baseline applied successfully" -Content $content -Step "01  模式   ───   02  信息   ───   03  预览   ───   04 [完成]" -Footer "按 Enter 返回终端"
+        Read-Host "按 Enter 返回终端" | Out-Null
     }
     catch {
         $message = $_.Exception.Message
-        Show-AwzTuiFrame -Title "操作未执行" -Subtitle "安全检查或初始化过程返回错误" -Content @("✕ $message", "", "没有通过预览的计划不会进入执行阶段。", "请检查目标路径或改用 Existing 模式。") -Step "01  模式   ───   02  信息   ───   03 [阻止]  ───   04  执行" -Footer "Enter / Q 返回终端"
-        while ($true) {
-            $key = [Console]::ReadKey($true)
-            if ($key.Key -in @("Enter", "Q", "Escape")) { break }
-        }
-    }
-    finally {
-        [Console]::CursorVisible = $oldCursorVisible
+        Show-AwzTuiFrame -Title "操作未执行" -Subtitle "安全检查或初始化过程返回错误" -Content @("✕ $message", "", "没有通过预览的计划不会进入执行阶段。", "请检查目标路径或改用 Existing 模式。") -Step "01  模式   ───   02  信息   ───   03 [阻止]  ───   04  执行" -Footer "按 Enter 返回终端"
+        Read-Host "按 Enter 返回终端" | Out-Null
     }
 }
 
@@ -262,12 +251,12 @@ if ($Help -or $Action -in @("--help", "-h", "help")) {
 
 if ($RenderDemo) {
     New-AwzTuiFrame -Title "选择工作模式" -Subtitle "新项目与已有项目采用完全不同的安全边界" -Content @(
-        "❯  创建新项目",
+        "[1]  创建新项目",
         "     仅允许不存在或完全为空的目标目录",
         "",
-        "   接入已有项目",
+        "[2]  接入已有项目",
         "     显式保留项目自有文件，只补充 AWZ 基线"
-    ) -Step "01 [模式]  ───   02  信息   ───   03  预览   ───   04  执行" -Footer "↑↓ 移动    Enter 确认    Q 退出" -Width 92
+    ) -Step "01 [模式]  ───   02  信息   ───   03  预览   ───   04  执行" -Footer "在面板下方输入编号；Q 退出" -Width 92
     return
 }
 
@@ -276,9 +265,9 @@ if (-not (Test-Path -LiteralPath $initializer -PathType Leaf)) {
     throw "Initializer not found: $initializer"
 }
 
-$useFullScreen = (-not $Action) -and (-not $Classic) -and (-not [Console]::IsInputRedirected)
-if ($useFullScreen) {
-    Invoke-FullScreenTui -InitializerPath $initializer
+$useTerminalWizard = (-not $Action) -and (-not $Classic) -and (-not [Console]::IsInputRedirected)
+if ($useTerminalWizard) {
+    Invoke-TerminalWizard -InitializerPath $initializer
     return
 }
 

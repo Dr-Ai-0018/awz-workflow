@@ -76,10 +76,13 @@ function New-AwzTuiFrame {
         [string]$Step = "01  模式   ───   02  信息   ───   03  预览   ───   04  执行",
         [string]$Footer = "↑↓ 移动    Enter 确认    Q 退出",
         [int]$Width = 92,
-        [int]$BodyHeight = 14
+        [int]$BodyHeight = 0
     )
 
     $Width = [Math]::Max(76, $Width)
+    if ($BodyHeight -le 0) {
+        $BodyHeight = [Math]::Min(14, [Math]::Max(8, $Content.Count + 1))
+    }
     $inner = $Width - 2
     $lines = [System.Collections.Generic.List[string]]::new()
     $lines.Add("╭" + ("─" * $inner) + "╮")
@@ -112,16 +115,32 @@ function Show-AwzTuiFrame {
         [string[]]$Content,
         [string]$Step,
         [string]$Footer,
-        [int]$BodyHeight = 14
+        [int]$BodyHeight = 0
     )
 
-    Clear-Host
+    Clear-Host 2>$null
     $frame = New-AwzTuiFrame -Title $Title -Subtitle $Subtitle -Content $Content -Step $Step -Footer $Footer -Width (Get-AwzTuiWidth) -BodyHeight $BodyHeight
-    foreach ($line in $frame) {
-        if ($line.StartsWith("╭") -or $line.StartsWith("├") -or $line.StartsWith("╰") -or $line.Contains("AWZ WORKFLOW")) {
+    for ($i = 0; $i -lt $frame.Count; $i++) {
+        $line = $frame[$i]
+        if ($line.StartsWith("╭") -or $line.StartsWith("├") -or $line.StartsWith("╰")) {
             Write-Host $line -ForegroundColor Cyan
         }
-        elseif ($line.Contains("❯")) {
+        elseif ($i -eq 1) {
+            Write-Host $line -ForegroundColor White -BackgroundColor DarkCyan
+        }
+        elseif ($i -eq 3) {
+            Write-Host $line -ForegroundColor Cyan
+        }
+        elseif ($i -eq 5) {
+            Write-Host $line -ForegroundColor White
+        }
+        elseif ($i -eq 6) {
+            Write-Host $line -ForegroundColor DarkGray
+        }
+        elseif ($i -eq ($frame.Count - 2)) {
+            Write-Host $line -ForegroundColor Black -BackgroundColor Cyan
+        }
+        elseif ($line -match '│\s+\[\d+\]') {
             Write-Host $line -ForegroundColor Black -BackgroundColor Cyan
         }
         else {
@@ -138,24 +157,22 @@ function Select-AwzTuiOption {
         [string]$Step
     )
 
-    $selected = 0
     while ($true) {
         $content = [System.Collections.Generic.List[string]]::new()
         for ($i = 0; $i -lt $Options.Count; $i++) {
-            $prefix = if ($i -eq $selected) { "❯" } else { " " }
-            $content.Add("$prefix  $($Options[$i].Label)")
+            $content.Add("[$($i + 1)]  $($Options[$i].Label)")
             $content.Add("     $($Options[$i].Description)")
             $content.Add("")
         }
-        Show-AwzTuiFrame -Title $Title -Subtitle $Subtitle -Content $content.ToArray() -Step $Step -Footer "↑↓ 移动    Enter 确认    Q 退出"
+        Show-AwzTuiFrame -Title $Title -Subtitle $Subtitle -Content $content.ToArray() -Step $Step -Footer "在面板下方输入编号；Q 退出"
 
-        $key = [Console]::ReadKey($true)
-        switch ($key.Key) {
-            "UpArrow" { $selected = ($selected - 1 + $Options.Count) % $Options.Count }
-            "DownArrow" { $selected = ($selected + 1) % $Options.Count }
-            "Enter" { return $Options[$selected].Value }
-            "Escape" { return $null }
-            "Q" { return $null }
+        $choice = (Read-Host "选择 [1-$($Options.Count)] 或 Q").Trim()
+        if ($choice -match '^[qQ]$') {
+            return $null
+        }
+        $number = 0
+        if ([int]::TryParse($choice, [ref]$number) -and $number -ge 1 -and $number -le $Options.Count) {
+            return $Options[$number - 1].Value
         }
     }
 }
@@ -170,38 +187,31 @@ function Read-AwzTuiText {
         [switch]$Required
     )
 
-    $buffer = $Value
     while ($true) {
-        $shown = if ($buffer) { $buffer } else { " " }
+        $defaultNote = if ($Value) { "直接按 Enter 使用默认值：$Value" } else { "请输入完整内容；支持粘贴。" }
         $content = @(
             $Label,
             "",
-            "┌" + ("─" * 66) + "┐",
-            "│ " + (Pad-AwzDisplayText -Text "$shown█" -Width 64) + " │",
-            "└" + ("─" * 66) + "┘",
+            "输入会在面板下方进行，终端原生编辑可正常粘贴、删除与移动光标。",
+            "",
+            $defaultNote,
             "",
             $Hint
         )
-        Show-AwzTuiFrame -Title $Title -Subtitle "直接输入；支持粘贴路径" -Content $content -Step $Step -Footer "Enter 下一步    Backspace 删除    Esc 取消"
+        Show-AwzTuiFrame -Title $Title -Subtitle "稳定输入模式：不逐键重绘终端" -Content $content -Step $Step -Footer "在面板下方输入；输入 Q 取消"
 
-        $key = [Console]::ReadKey($true)
-        switch ($key.Key) {
-            "Enter" {
-                if ((-not $Required) -or $buffer) {
-                    return $buffer
-                }
-            }
-            "Escape" { return $null }
-            "Backspace" {
-                if ($buffer.Length -gt 0) {
-                    $buffer = $buffer.Substring(0, $buffer.Length - 1)
-                }
-            }
-            default {
-                if (-not [char]::IsControl($key.KeyChar)) {
-                    $buffer += $key.KeyChar
-                }
-            }
+        $input = Read-Host $Label
+        if ($input -ceq "Q") {
+            return $null
+        }
+        if ($input) {
+            return $input
+        }
+        if ($Value) {
+            return $Value
+        }
+        if (-not $Required) {
+            return ""
         }
     }
 }
@@ -215,36 +225,60 @@ function Show-AwzTuiPreview {
         [bool]$Refresh
     )
 
-    $offset = 0
-    $pageSize = 8
+    $content = @(
+        "目标   $Target",
+        "项目   $Project",
+        "模式   $SelectedMode     刷新 AWZ 文件   $Refresh",
+        "",
+        "完整 DryRun 输出已在上一页展示并停留 3 秒，可用终端原生滚动回看。",
+        "确认无误后输入 A 应用，输入 Q 取消。"
+    )
+    Show-AwzTuiFrame -Title "检查变更计划" -Subtitle "预览已通过；执行前请检查完整输出" -Content $content -Step "01  模式   ───   02  信息   ───   03 [预览]  ───   04  执行" -Footer "查看完整计划后输入 A 应用；Q 取消"
     while ($true) {
-        $maxOffset = [Math]::Max(0, $PreviewLines.Count - $pageSize)
-        $offset = [Math]::Min($maxOffset, [Math]::Max(0, $offset))
-        $page = @($PreviewLines | Select-Object -Skip $offset -First $pageSize)
-        $content = @(
-            "目标   $Target",
-            "项目   $Project",
-            "模式   $SelectedMode     刷新 AWZ 文件   $Refresh",
-            "",
-            "DRY RUN  $($offset + 1)-$([Math]::Min($PreviewLines.Count, $offset + $pageSize)) / $($PreviewLines.Count)",
-            "──────────────────────────────────────────────────────────────────"
-        ) + $page
-
-        Show-AwzTuiFrame -Title "检查变更计划" -Subtitle "预览已通过；执行前请检查完整输出" -Content $content -Step "01  模式   ───   02  信息   ───   03 [预览]  ───   04  执行" -Footer "↑↓ 滚动    PgUp/PgDn 翻页    Enter/A 应用    Q 取消"
-        $key = [Console]::ReadKey($true)
-        switch ($key.Key) {
-            "UpArrow" { $offset-- }
-            "DownArrow" { $offset++ }
-            "PageUp" { $offset -= $pageSize }
-            "PageDown" { $offset += $pageSize }
-            "Home" { $offset = 0 }
-            "End" { $offset = $maxOffset }
-            "Enter" { return $true }
-            "A" { return $true }
-            "Escape" { return $false }
-            "Q" { return $false }
+        $choice = (Read-Host "输入 A 应用，Q 取消").Trim()
+        if ($choice -ceq "A") {
+            return $true
+        }
+        if ($choice -match '^[qQ]$') {
+            return $false
         }
     }
+}
+
+function Show-AwzTuiLog {
+    param(
+        [string]$Title,
+        [string]$Subtitle,
+        [string[]]$Lines,
+        [string]$Step,
+        [int]$PauseSeconds = 3
+    )
+
+    $content = @(
+        "已记录 $($Lines.Count) 行输出。",
+        "日志会保留 $PauseSeconds 秒，随后进入下一阶段。",
+        ""
+    )
+    Show-AwzTuiFrame -Title $Title -Subtitle $Subtitle -Content $content -Step $Step -Footer "日志展示中；请勿关闭终端"
+    Write-Host ""
+    Write-Host "── ACTIVITY LOG ─────────────────────────────────────────────────────────────" -ForegroundColor Cyan
+    foreach ($line in $Lines) {
+        if ($line -match '^(Wrote|Created|Ran|DryRun: preview complete)') {
+            Write-Host $line -ForegroundColor Green
+        }
+        elseif ($line -match '^(DryRun:|WARNING:|Warning:)') {
+            Write-Host $line -ForegroundColor Yellow
+        }
+        elseif ($line -match '(?i)error|refused|failed') {
+            Write-Host $line -ForegroundColor Red
+        }
+        else {
+            Write-Host $line
+        }
+    }
+    Write-Host "────────────────────────────────────────────────────────────────────────────" -ForegroundColor Cyan
+    Write-Host "将在 $PauseSeconds 秒后继续…" -ForegroundColor DarkGray
+    Start-Sleep -Seconds $PauseSeconds
 }
 
 Export-ModuleMember -Function @(
@@ -252,5 +286,6 @@ Export-ModuleMember -Function @(
     "Show-AwzTuiFrame",
     "Select-AwzTuiOption",
     "Read-AwzTuiText",
-    "Show-AwzTuiPreview"
+    "Show-AwzTuiPreview",
+    "Show-AwzTuiLog"
 )

@@ -28,22 +28,21 @@ bash scripts/awz.sh
 
 `awz.bat` 只选择 `pwsh` 或 Windows PowerShell，并把参数转交给 `awz.ps1`。`awz.ps1` 与 `awz.sh` 负责交互；真实初始化仍分别由 `init-project.ps1` 与 `init-project.sh` 完成。
 
-Windows 全屏渲染、中文宽度计算、方向键输入和滚动预览集中在 `scripts/lib/AwzTui.psm1`；`awz.ps1` 只保留流程编排与底层初始化器调用，避免继续膨胀成单文件应用。
+Windows 的阶段面板、中文宽度计算、编号选择与预览呈现集中在 `scripts/lib/AwzTui.psm1`；`awz.ps1` 只保留流程编排与底层初始化器调用，避免继续膨胀成单文件应用。
 
-## Windows 全屏 TUI
+## Windows 终端向导
 
-`awz.bat` 默认用 `-NoProfile` 启动 PowerShell，`awz.ps1` 在真实终端中默认进入全屏模式。它提供：
+`awz.bat` 默认用 `-NoProfile` 启动 PowerShell，`awz.ps1` 在真实终端中默认进入分步终端向导。它提供：
 
-1. 方向键选择新项目或已有项目模式；
-2. 分步输入目标目录、项目名和 License owner；
+1. 编号选择新项目或已有项目模式；
+2. 分步输入目标目录、项目名和 License owner；输入阶段使用 PowerShell 原生单行编辑，支持粘贴路径；
 3. 已有项目刷新策略选择；
-4. 强制 DryRun 和可滚动预览窗口；
+4. 强制 DryRun 与实际应用日志视图；两者都会完整展示、停留 3 秒，再进入下一阶段；输出仍可通过终端原生滚动回看；
 5. Existing + Force 的 `APPLY` 明文确认；
 6. 执行中、完成和错误状态页面；
-7. 中文等宽布局宽度修正和窄窗口内容裁剪；
-8. 退出时恢复光标状态。
+7. 中文等宽布局宽度修正和窄窗口内容裁剪。
 
-方向键、`PageUp` / `PageDown`、`Home` / `End` 用于选择或滚动，`Enter` 确认，`Q` / `Esc` 取消。已有项目且刷新 AWZ 文件时，必须输入大写 `APPLY`；脚本化调用则需要同时显式给出 Existing、Force 和 Yes。
+输入 `1` / `2` 选择模式；输入 `A` 应用预览计划，输入 `Q` 取消。已有项目且刷新 AWZ 文件时，必须输入大写 `APPLY`；脚本化调用则需要同时显式给出 Existing、Force 和 Yes。不要在输入阶段逐键重绘整个终端页面，这会在 ConPTY/Windows Terminal 环境造成残影或错位。
 
 终端不支持 `ReadKey`、输入被重定向或需要传统提示时，可以使用：
 
@@ -124,7 +123,7 @@ bash scripts/smoke-awz-tui.sh
 - 默认模式拒绝非空目标；
 - 被拒绝目标不出现新增模板文件；
 - Windows BAT 参数转发可用；
-- 全屏 frame 包含完整边框、步骤栏、选中态与快捷键栏；
+- 终端向导 frame 包含完整边框、步骤栏、编号选择与明确的输入提示；
 - 测试结束后没有临时残留。
 
 ## 后续演进
