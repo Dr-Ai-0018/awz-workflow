@@ -62,6 +62,10 @@ try {
 
     git -C $smokePath check-ignore -q -- ".env.example"
     Assert-True ($LASTEXITCODE -ne 0) ".env.example must remain trackable"
+    $referenceMapPath = Join-Path $smokePath ".awz/references.json"
+    Assert-True (Test-Path -LiteralPath $referenceMapPath) ".awz/references.json was not generated"
+    git -C $smokePath check-ignore -q -- ".awz/references.json"
+    Assert-True ($LASTEXITCODE -ne 0) ".awz/references.json must remain trackable"
 
     $readmePath = Join-Path $smokePath "README.md"
     Set-Content -LiteralPath $readmePath -Value "custom local README" -Encoding UTF8
@@ -79,10 +83,12 @@ try {
     Assert-True ((Get-Content -LiteralPath $readmePath -Raw -Encoding UTF8).Trim() -eq "custom local README") "Existing mode overwrote README without -Force"
 
     $agentsPath = Join-Path $smokePath "AGENTS.md"
+    Set-Content -LiteralPath $referenceMapPath -Value '{"schemaVersion":1,"references":[{"id":"custom"}]}' -Encoding UTF8
     Set-Content -LiteralPath $agentsPath -Value "custom local AGENTS" -Encoding UTF8
     & $initializer -TargetPath $smokePath -Mode Existing -Force
     Assert-True ((Get-Content -LiteralPath $readmePath -Raw -Encoding UTF8).Trim() -eq "custom local README") "-Force overwrote a protected project README"
     Assert-True (-not ((Get-Content -LiteralPath $agentsPath -Raw -Encoding UTF8).Contains("custom local AGENTS"))) "-Force did not refresh AWZ-managed AGENTS.md"
+    Assert-True ((Get-Content -LiteralPath $referenceMapPath -Raw -Encoding UTF8).Contains('"id":"custom"')) "-Force overwrote project-owned .awz/references.json"
 
     New-Item -ItemType Directory -Path $occupiedPath | Out-Null
     Set-Content -LiteralPath (Join-Path $occupiedPath "valuable.txt") -Value "preserve me" -Encoding UTF8

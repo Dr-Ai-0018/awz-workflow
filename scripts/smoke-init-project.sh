@@ -46,6 +46,10 @@ done
 if git -C "$smoke_path" check-ignore -q -- .env.example; then
     die '.env.example must remain trackable'
 fi
+[[ -f "$smoke_path/.awz/references.json" ]] || die '.awz/references.json was not generated'
+if git -C "$smoke_path" check-ignore -q -- .awz/references.json; then
+    die '.awz/references.json must remain trackable'
+fi
 
 printf '%s\n' 'custom local README' > "$smoke_path/README.md"
 if bash "$initializer" --target "$smoke_path"; then
@@ -57,11 +61,13 @@ bash "$initializer" --target "$smoke_path" --mode existing
 [[ "$(<"$smoke_path/README.md")" == 'custom local README' ]] || die 'Existing mode overwrote README without --force'
 
 printf '%s\n' 'custom local AGENTS' > "$smoke_path/AGENTS.md"
+printf '%s\n' '{"schemaVersion":1,"references":[{"id":"custom"}]}' > "$smoke_path/.awz/references.json"
 bash "$initializer" --target "$smoke_path" --mode existing --force
 [[ "$(<"$smoke_path/README.md")" == 'custom local README' ]] || die '--force overwrote a protected project README'
 if grep -Fq 'custom local AGENTS' "$smoke_path/AGENTS.md"; then
     die '--force did not refresh AWZ-managed AGENTS.md'
 fi
+grep -Fq '"id":"custom"' "$smoke_path/.awz/references.json" || die '--force overwrote project-owned .awz/references.json'
 
 mkdir -p "$occupied_path"
 printf '%s\n' 'preserve me' > "$occupied_path/valuable.txt"

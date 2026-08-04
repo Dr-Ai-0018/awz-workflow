@@ -213,6 +213,7 @@ root_files=(
     'CLAUDE.md|CLAUDE.md|false|false'
     'gitignore.template|.gitignore|false|true'
     'env.example|.env.example|false|true'
+    'references.json|.awz/references.json|false|true'
     'README.template.md|README.md|true|true'
     'LICENSE-MIT|LICENSE|true|true'
 )
@@ -292,7 +293,9 @@ fi
 
 if [[ "$dry_run" == true ]]; then
     printf '%s\n' 'DryRun: will not generate pyproject.toml, package.json, Docker, CI, or deployment config unless a matching project type is chosen later.'
+    printf '%s\n' 'DryRun: will not create, clone, or update the optional Reference Library.'
     printf 'DryRun: preview complete; no files were written: %s\n' "$target_path"
 else
     printf 'AWZ project baseline initialized in %s mode: %s\n' "$mode" "$target_path"
+    printf '%s\n' 'Reference mapping: .awz/references.json; no reference repositories were cloned or updated.'
 fi

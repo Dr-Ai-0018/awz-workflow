@@ -41,6 +41,12 @@ review、debug、hardening：
 - `docs/agent-room/guides/frontend.md`
 - `docs/agent-room/guides/verification.md`
 
+参考项目、第三方源码借鉴：
+
+- `.awz/references.json`
+- `docs/agent-room/reference-context.md`（存在时）
+- 先按 mapping 和 `readFirst` 定向读取，不扫描整个机器级参考库
+
 Git、分支、commit、版本：
 
 - `docs/agent-room/guides/git-workflow.md`

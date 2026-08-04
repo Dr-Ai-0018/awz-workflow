@@ -21,6 +21,14 @@
 - review/debug/hardening 时，读 `docs/agent-room/guides/review.md`，并读或创建 `docs/agent-room/reviews/` 下的 checklist。
 - 不要机械读取所有文件；按任务类型扩展上下文。
 
+## 参考项目
+
+- 项目 reference mapping 位于可提交的 `.awz/references.json`。
+- 如果存在 `docs/agent-room/reference-context.md`，只在当前任务命中其用途时读取对应 reference。
+- 先读 reference 的 `readFirst`，不要递归扫描整个机器级参考库。
+- reference 默认是 `source-only` 外部代码；不要自动安装、构建、执行或复制非平凡代码。
+- reference 只能提供思路和证据，最终实现必须遵循当前项目 contract 与 license。
+
 ## 本地路径
 
 永远不要提交：

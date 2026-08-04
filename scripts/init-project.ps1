@@ -195,6 +195,7 @@ $rootFiles = @(
     @{ Source = "CLAUDE.md"; Dest = "CLAUDE.md"; Render = $false; ProtectInExisting = $false },
     @{ Source = "gitignore.template"; Dest = ".gitignore"; Render = $false; ProtectInExisting = $true },
     @{ Source = "env.example"; Dest = ".env.example"; Render = $false; ProtectInExisting = $true },
+    @{ Source = "references.json"; Dest = ".awz/references.json"; Render = $false; ProtectInExisting = $true },
     @{ Source = "README.template.md"; Dest = "README.md"; Render = $true; ProtectInExisting = $true },
     @{ Source = "LICENSE-MIT"; Dest = "LICENSE"; Render = $true; ProtectInExisting = $true }
 )
@@ -275,8 +276,10 @@ if ($needsGitInit) {
 
 if ($DryRun) {
     Write-Host "DryRun: will not generate pyproject.toml, package.json, Docker, CI, or deployment config unless a matching project type is chosen later."
+    Write-Host "DryRun: will not create, clone, or update the optional Reference Library."
     Write-Host "DryRun: preview complete; no files were written: $targetPath"
 }
 else {
     Write-Host "AWZ project baseline initialized in $Mode mode: $targetPath"
+    Write-Host "Reference mapping: .awz/references.json; no reference repositories were cloned or updated."
 }

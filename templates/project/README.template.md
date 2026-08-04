@@ -1,5 +1,7 @@
 # {{PROJECT_NAME}}
 
+本项目使用 AWZ Workflow 初始化。可选参考项目通过 `.awz/references.json` 声明；该文件不保存本机绝对路径，初始化过程不会联网或自动 clone。
+
 ## 项目简介
 
 说明这个项目做什么、给谁用、解决什么问题。

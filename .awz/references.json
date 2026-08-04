@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "references": [
+    {
+      "id": "gsap",
+      "purpose": "前端交互动效、ScrollTrigger 与 Flip 参考",
+      "required": false
+    }
+  ]
+}
