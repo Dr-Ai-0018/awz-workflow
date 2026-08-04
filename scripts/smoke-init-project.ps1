@@ -56,7 +56,7 @@ try {
     $branch = git -C $smokePath symbolic-ref --short HEAD
     Assert-True ($branch -eq "main") "Git branch is not main"
 
-    foreach ($path in @("AGENTS.md", "CLAUDE.md", "docs", "temp", ".env")) {
+    foreach ($path in @("AGENTS.md", "CLAUDE.md", "docs", "docs/agent-room/room-ledger.py", "docs/agent-room/guides/room-ledger.md", "temp", ".env")) {
         Assert-Ignored $path
     }
 

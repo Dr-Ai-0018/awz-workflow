@@ -17,6 +17,7 @@
 - 新 Agent 进入项目时，读 `docs/agent-room/onboarding.md`。
 - 按任务类型读取 `docs/agent-room/guides/` 下的对应指南。
 - 多 Agent 协作时，读 `docs/agent-room/guides/collaboration.md`、`docs/agent-room/handoffs/` 和当前 owner 表。
+- 共享 room 时间线时，读 `docs/agent-room/guides/room-ledger.md`，并使用 `docs/agent-room/room-ledger.py` 追加。
 - review/debug/hardening 时，读 `docs/agent-room/guides/review.md`，并读或创建 `docs/agent-room/reviews/` 下的 checklist。
 - 不要机械读取所有文件；按任务类型扩展上下文。
 
@@ -46,6 +47,7 @@
 - `status.md` 记录当前阶段、owner、阻塞项和下一步。
 - `handoffs/` 存放跨 Agent 交接。
 - `reviews/` 存放 P0/P1/P2/P3 checklist。
+- `room.ndjson` 是 append-only 时间线；禁止用 `apply_patch`、通用分隔符或署名定位追加，历史修正只能追加 `amend`。
 - 重要结论要沉淀到可提交文件、issue/PR 或正式文档，不要只留在 ignored `docs/`。
 
 ## 工具默认值

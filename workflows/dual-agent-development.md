@@ -11,6 +11,8 @@
 ```text
 docs/agent-room/
 ├─ status.md
+├─ room.ndjson
+├─ room-ledger.py
 ├─ handoffs/
 ├─ reviews/
 ├─ decisions/
@@ -20,6 +22,8 @@ docs/agent-room/
 用途：
 
 - `status.md`：当前阶段、owner、阻塞项、下一步；
+- `room.ndjson`：append-only 协作时间线；
+- `room-ledger.py`：时间线唯一追加入口；
 - `handoffs/`：跨 Agent 交接；
 - `reviews/`：review checklist 和发现的问题；
 - `decisions/`：本地 ADR 草稿或方案对比；
@@ -33,6 +37,7 @@ docs/agent-room/
 - 事实、验证和决策要写清楚；
 - 闲聊可以轻量存在，但不能替代任务状态；
 - 重要结论要及时沉淀到可提交文件、issue/PR 或正式 ADR。
+- 时间线记录不得用 `apply_patch`、重复分隔符或署名定位追加；旧记录只能通过 `amend` 记录勘误。
 
 ## 默认分工
 
@@ -136,7 +141,7 @@ Owner：
 
 ## Owner 和文件占用
 
-多 Agent 协作时，不做复杂锁系统，默认使用轻量 owner 表。
+多 Agent 协作仍默认使用轻量 owner 表管理职责；时间线追加由 `room-ledger.py` 的文件锁串行化。这个锁只保护 ledger 写入，不替代 owner 表，也不允许绕过追加工具直接改文件。
 
 在 `docs/agent-room/status.md` 里维护：
 

@@ -8,6 +8,8 @@
 docs/
 ├─ agent-room/
 │  ├─ status.md
+│  ├─ room.ndjson
+│  ├─ room-ledger.py
 │  ├─ guides/
 │  ├─ handoffs/
 │  ├─ reviews/
@@ -19,6 +21,8 @@ docs/
 使用规则：
 
 - `agent-room/status.md` 记录当前阶段、owner、阻塞项和下一步；
+- `agent-room/room.ndjson` 是受锁保护的 append-only 协作时间线；
+- `agent-room/room-ledger.py` 是唯一的时间线追加入口；
 - `agent-room/guides/` 按任务类型保存分层指导；
 - `agent-room/handoffs/` 放跨 Agent 交接；
 - `agent-room/reviews/` 放 P0/P1/P2/P3 checklist；
@@ -29,6 +33,7 @@ docs/
 初始化脚本会在对应目录放入轻量模板：
 
 - `agent-room/guides/collaboration.md`
+- `agent-room/guides/room-ledger.md`
 - `agent-room/guides/repository-hygiene.md`
 - `agent-room/guides/git-workflow.md`
 - `agent-room/guides/verification.md`

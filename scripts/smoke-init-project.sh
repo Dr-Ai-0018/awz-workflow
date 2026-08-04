@@ -39,7 +39,7 @@ bash "$initializer" --target "$smoke_path" --name "AWZ Init Smoke"
 [[ -d "$smoke_path/.git" ]] || die 'Git repository was not initialized'
 [[ "$(git -C "$smoke_path" symbolic-ref --short HEAD)" == 'main' ]] || die 'Git branch is not main'
 
-for path in AGENTS.md CLAUDE.md docs temp .env; do
+for path in AGENTS.md CLAUDE.md docs docs/agent-room/room-ledger.py docs/agent-room/guides/room-ledger.md temp .env; do
     git -C "$smoke_path" check-ignore -q -- "$path" || die "$path should be ignored"
 done
 

@@ -24,6 +24,7 @@ Claude Code 默认负责：
 `docs/agent-room/` 是本地 Agent 交流区，默认不进 git。
 
 - `status.md`：当前阶段、owner、阻塞项、下一步；
+- `room.ndjson`：受锁保护的 append-only 时间线，必须通过 `room-ledger.py` 写入；
 - `handoffs/`：跨 Agent 交接；
 - `reviews/`：P0/P1/P2/P3 checklist；
 - `decisions/`：本地 ADR 草稿和方案对比；
@@ -49,3 +50,5 @@ Agent 可以在交流区留下判断、疑问和风险提示，但要服务项�
 - `done`：阶段完成，可以交接或合并。
 
 重要结论要沉淀到代码、README、公开文档、ADR、issue/PR 或正式记录，不要只留在 ignored `docs/`。
+
+时间线记录不得使用重复的 `---`、署名或标题作为追加锚点。旧记录需要修正时，追加 `amend` 并引用原记录 ID，不能原地改写别人的记录。具体命令和校验规则见 `room-ledger.md`。

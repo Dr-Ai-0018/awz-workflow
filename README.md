@@ -32,6 +32,7 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 - `.gitignore`、`.env.example`、本地 `docs/`、`temp/` 规则；
 - 本地 ignored `AGENTS.md` / `CLAUDE.md` 指令文件；
 - `docs/agent-room/` 交流区、handoff 和 review checklist；
+- append-only room ledger、并发追加和历史篡改检测；
 - Codex + Claude Code 双核协作方式；
 - git 分支、阶段、版本和 commit 节奏；
 - 代码架构和文件复杂度基线；
@@ -49,6 +50,7 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 │  └─ awz-workflow-v0.1.md
 ├─ workflows/
 │  ├─ dual-agent-development.md
+│  ├─ room-ledger.md
 │  ├─ agent-onboarding.md
 │  ├─ project-initialization.md
 │  ├─ review-and-fix.md
@@ -71,6 +73,8 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 │  ├─ smoke-awz-tui.sh
 │  ├─ smoke-init-project.ps1
 │  ├─ smoke-init-project.sh
+│  ├─ room-ledger.py
+│  ├─ smoke-room-ledger.py
 │  ├─ package-release.ps1
 │  └─ package-release.sh
 ├─ VERSION
@@ -80,6 +84,7 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
       ├─ AGENTS.md
       ├─ CLAUDE.md
       ├─ agent-onboarding.md
+      ├─ room-ledger.py
       ├─ guides/
       ├─ agent-status.template.md
       ├─ handoff.template.md
@@ -137,7 +142,7 @@ Ubuntu/POSIX：
 bash scripts/awz.sh
 ```
 
-Windows TUI 使用全屏边框布局、方向键选择、分步输入、可滚动 DryRun 预览、危险操作确认以及完成/错误页面。自动化环境也可以传入完整参数和 `-Yes` / `--yes`，但不能跳过预览与底层安全检查。详细契约见 [TUI 与 CLI 工作流](workflows/tui.md)。
+Windows 终端向导使用稳定的分步面板、编号选择、原生单行输入、完整 DryRun 预览、危险操作确认以及完成/错误页面。输入和预览交给终端原生编辑、粘贴与滚动，避免逐键重绘在 Windows Terminal/ConPTY 下造成残影或错位。自动化环境也可以传入完整参数和 `-Yes` / `--yes`，但不能跳过预览与底层安全检查。详细契约见 [TUI 与 CLI 工作流](workflows/tui.md)。
 
 ## 硬边界
 

@@ -238,6 +238,7 @@ local_dirs=(
 local_files=(
     'docs-layout.md|docs/README.md|false'
     'agent-onboarding.md|docs/agent-room/onboarding.md|false'
+    'room-ledger.py|docs/agent-room/room-ledger.py|false'
     'guides/collaboration.md|docs/agent-room/guides/collaboration.md|false'
     'guides/repository-hygiene.md|docs/agent-room/guides/repository-hygiene.md|false'
     'guides/git-workflow.md|docs/agent-room/guides/git-workflow.md|false'
@@ -246,6 +247,7 @@ local_files=(
     'guides/frontend.md|docs/agent-room/guides/frontend.md|false'
     'guides/blockers-and-safety.md|docs/agent-room/guides/blockers-and-safety.md|false'
     'guides/review.md|docs/agent-room/guides/review.md|false'
+    'guides/room-ledger.md|docs/agent-room/guides/room-ledger.md|false'
     'agent-status.template.md|docs/agent-room/status.md|true'
     'handoff.template.md|docs/agent-room/handoffs/handoff.template.md|false'
     'review-checklist.template.md|docs/agent-room/reviews/review-checklist.template.md|false'

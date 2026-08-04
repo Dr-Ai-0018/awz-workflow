@@ -8,6 +8,7 @@
 
 ### Added
 
+- append-only room ledger：受锁追加、递增序号、UTC/唯一 ID、SHA-256 链和跨平台 smoke 覆盖。
 - Windows 与 POSIX 的初始化器轻量回归 smoke 脚本。
 - Windows `init-project.bat` 快捷入口，复用 PowerShell 核心实现并为后续交互入口保留稳定参数层。
 - Windows `awz.bat` / `awz.ps1` 与 POSIX `awz.sh` 终端交互入口。

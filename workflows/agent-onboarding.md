@@ -35,6 +35,7 @@ Ubuntu/VPS 初始化、release 包或远端发布：
 多 Agent 协作：
 
 - `workflows/dual-agent-development.md`
+- `workflows/room-ledger.md`
 - `docs/agent-room/status.md`
 - `docs/agent-room/handoffs/`
 

@@ -21,6 +21,7 @@
 多 Agent 协作：
 
 - `docs/agent-room/guides/collaboration.md`
+- `docs/agent-room/guides/room-ledger.md`
 - `docs/agent-room/status.md`
 - `docs/agent-room/handoffs/`
 
