@@ -59,6 +59,14 @@ try {
 
     Invoke-Reference -Arguments @("configure", "--root", $libraryRoot) | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $configDir "config.json")) "configure did not write config"
+    $configurePlanOutput = Invoke-Reference -Arguments @("configure", "--root", $libraryRoot, "--dry-run", "--json")
+    $configurePlan = (($configurePlanOutput -join "`n") | ConvertFrom-Json)
+    Assert-True ($configurePlan.operation -eq "reference.configure") "configure JSON operation is invalid"
+    Assert-True ([bool]$configurePlan.plan.planHash) "configure JSON plan hash is missing"
+    Invoke-Reference -Arguments @("configure", "--root", $libraryRoot, "--json", "--plan-hash", $configurePlan.plan.planHash) | Out-Null
+    $writtenConfig = Get-Content -LiteralPath (Join-Path $configDir "config.json") -Raw | ConvertFrom-Json
+    Assert-True ($writtenConfig.schemaVersion -eq 2) "configure did not write schema v2"
+    Invoke-Reference -Arguments @("configure", "--root", $libraryRoot, "--json") -ExpectedExitCode 1 | Out-Null
     foreach ($directory in @("catalog", "repos", "context-cache", "logs")) {
         Assert-True (Test-Path -LiteralPath (Join-Path $libraryRoot $directory)) "missing library directory: $directory"
     }

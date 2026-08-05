@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -29,7 +30,8 @@ from reference_library.catalog import (
     validate_public_url,
     validate_reference_id,
 )
-from reference_library.config import SCHEMA_VERSION, ensure_library_layout, library_root, load_config
+from reference_library.config import SCHEMA_VERSION, default_config, ensure_library_layout, library_root, load_config
+from reference_library.contracts import build_plan, operation_result, print_result, require_matching_plan, snapshot_paths
 from reference_library.errors import ReferenceLibraryError
 from reference_library.git_tools import require_git, run_git
 from reference_library.paths import config_path, require_within, resolved_path
@@ -47,6 +49,33 @@ def write_stderr(message: str) -> None:
     print(f"Error: {message}", file=sys.stderr)
 
 
+def emit_json_result(
+    args: argparse.Namespace,
+    operation: str,
+    exit_code: int,
+    *,
+    dry_run: bool,
+    plan: Optional[Dict[str, Any]] = None,
+    data: Optional[Dict[str, Any]] = None,
+) -> bool:
+    if not getattr(args, "json_output", False):
+        return False
+    print_result(operation_result(operation, exit_code, dry_run=dry_run, plan=plan, data=data))
+    return True
+
+
+def write_plan(
+    operation: str, changes: List[Dict[str, Any]], snapshot_targets: List[Path]
+) -> Dict[str, Any]:
+    return build_plan(operation, changes, snapshot_paths(snapshot_targets))
+
+
+def validate_apply_plan(args: argparse.Namespace, plan: Dict[str, Any]) -> None:
+    if args.json_output and not args.plan_hash:
+        raise ReferenceLibraryError("Machine-readable apply requires --plan-hash from the prior DryRun preview.")
+    require_matching_plan(plan, args.plan_hash)
+
+
 def command_configure(args: argparse.Namespace) -> int:
     root = library_root({"referenceRoot": args.root})
     path = config_path()
@@ -55,9 +84,10 @@ def command_configure(args: argparse.Namespace) -> int:
         from reference_library.storage import read_json
 
         existing = read_json(path, "AWZ config")
-        if existing.get("schemaVersion") not in (None, SCHEMA_VERSION):
+        if existing.get("schemaVersion") not in (None, 1, SCHEMA_VERSION):
             raise ReferenceLibraryError(f"Unsupported AWZ config schemaVersion in {path}")
     data = {
+        **default_config(),
         **existing,
         "schemaVersion": SCHEMA_VERSION,
         "referenceRoot": str(root),
@@ -65,13 +95,26 @@ def command_configure(args: argparse.Namespace) -> int:
         "networkPolicy": "explicit",
         "executionPolicy": "source-only",
     }
+    plan = write_plan(
+        "reference.configure",
+        [
+            {"kind": "write-json", "target": str(path), "summary": "写入机器级 Reference Library 配置"},
+            {"kind": "ensure-layout", "target": str(root), "summary": "创建或验证 Reference Library 目录结构"},
+        ],
+        [path, root],
+    )
     if args.dry_run:
+        if emit_json_result(args, "reference.configure", 0, dry_run=True, plan=plan, data={"config": data}):
+            return 0
         print(f"DryRun: would write AWZ config: {path}")
         print(f"DryRun: would create reference layout: {root}")
         print("DryRun: would not clone or update repositories.")
         return 0
+    validate_apply_plan(args, plan)
     ensure_library_layout(root)
     write_json_atomic(path, data)
+    if emit_json_result(args, "reference.configure", 0, dry_run=False, plan=plan, data={"config": data}):
+        return 0
     print(f"Configured Reference Library: {root}")
     print(f"Config: {path}")
     return 0
@@ -106,14 +149,34 @@ def command_add(args: argparse.Namespace) -> int:
     else:
         stored_url = validate_public_url(source)
 
-    print(f"Reference root: {root} ({'configured' if configured else 'default'})")
+    plan = write_plan(
+        "reference.add",
+        [
+            {"kind": "git-clone", "target": str(destination), "summary": "clone 公开参考仓库，不执行其代码或 submodule"},
+            {"kind": "write-json", "target": str(metadata_path), "summary": "写入 reference catalog"},
+        ],
+        [destination, metadata_path],
+    )
     if args.dry_run:
+        if emit_json_result(
+            args,
+            "reference.add",
+            0,
+            dry_run=True,
+            plan=plan,
+            data={"id": reference_id, "destination": str(destination), "repositoryUrl": sanitize_url(stored_url)},
+        ):
+            return 0
+        print(f"Reference root: {root} ({'configured' if configured else 'default'})")
         print(f"DryRun: would clone {sanitize_url(stored_url)}")
         print(f"DryRun: destination {destination}")
         print(f"DryRun: would write catalog {metadata_path}")
         print("DryRun: would not initialize submodules or execute repository code.")
         return 0
 
+    validate_apply_plan(args, plan)
+    if not args.json_output:
+        print(f"Reference root: {root} ({'configured' if configured else 'default'})")
     ensure_library_layout(root)
     destination.parent.mkdir(parents=True, exist_ok=True)
     clone_arguments: List[str] = []
@@ -130,6 +193,7 @@ def command_add(args: argparse.Namespace) -> int:
         head = run_git(["rev-parse", "HEAD"], cwd=destination).stdout.strip()
         branch_process = run_git(["symbolic-ref", "--short", "-q", "HEAD"], cwd=destination, check=False)
         read_first = split_values(args.read_first) or default_read_first(destination)
+        timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         metadata: Dict[str, Any] = {
             "schemaVersion": SCHEMA_VERSION,
             "id": reference_id,
@@ -146,6 +210,10 @@ def command_add(args: argparse.Namespace) -> int:
             "avoidWhen": split_values(args.avoid_when),
             "license": detect_license(destination),
             "licenseUrl": args.license_url or None,
+            "notes": "",
+            "source": {"kind": "public-git"},
+            "createdAt": timestamp,
+            "updatedAt": timestamp,
         }
         write_json_atomic(metadata_path, metadata)
     except Exception as exc:
@@ -153,6 +221,15 @@ def command_add(args: argparse.Namespace) -> int:
             f"Repository clone was preserved at {destination}, but catalog creation failed: {exc}"
         ) from exc
 
+    if emit_json_result(
+        args,
+        "reference.add",
+        0,
+        dry_run=False,
+        plan=plan,
+        data={"id": reference_id, "destination": str(destination), "revision": head},
+    ):
+        return 0
     print(f"Added reference {reference_id}: {destination}")
     print(f"Revision: {head}")
     print(f"Catalog: {metadata_path}")
@@ -163,15 +240,19 @@ def command_list(_: argparse.Namespace) -> int:
     config, path, configured = load_config()
     root = library_root(config)
     catalogs = load_catalogs(root)
+    rows = []
+    for reference_id, catalog in catalogs.items():
+        state = repository_state(root, catalog)
+        rows.append({"id": reference_id, "version": catalog.get("version") or "unknown", "state": state})
+    if emit_json_result(_, "reference.list", 0, dry_run=False, data={"referenceRoot": str(root), "configured": configured, "references": rows}):
+        return 0
     print(f"Reference root: {root} ({'configured' if configured else 'default'})")
     print(f"Config: {path}{'' if configured else ' (not written)'}")
     if not catalogs:
         print("No references registered.")
         return 0
-    for reference_id, catalog in catalogs.items():
-        state = repository_state(root, catalog)
-        version = catalog.get("version") or "unknown"
-        print(f"{reference_id}\t{state['status']}\t{version}\t{state['path']}")
+    for row in rows:
+        print(f"{row['id']}\t{row['state']['status']}\t{row['version']}\t{row['state']['path']}")
     return 0
 
 
@@ -179,11 +260,12 @@ def command_show(args: argparse.Namespace) -> int:
     reference_id = validate_reference_id(args.id)
     config, _, _ = load_config()
     root = library_root(config)
-    path = catalog_path(root, reference_id)
-    from reference_library.storage import read_json
-
-    data = read_json(path, "reference catalog")
+    data = load_catalogs(root).get(reference_id)
+    if data is None:
+        raise ReferenceLibraryError(f"reference catalog not found: {catalog_path(root, reference_id)}")
     data["state"] = repository_state(root, data)
+    if emit_json_result(args, "reference.show", 0, dry_run=False, data={"reference": data}):
+        return 0
     print(json.dumps(data, ensure_ascii=False, indent=2))
     return 0
 
@@ -198,7 +280,7 @@ def command_map(args: argparse.Namespace) -> int:
     mapping = load_project_mapping(project, allow_missing=True)
     references = mapping["references"]
     entry = next((item for item in references if isinstance(item, dict) and item.get("id") == reference_id), None)
-    new_entry = {"id": reference_id, "purpose": args.purpose or "", "required": bool(args.required)}
+    new_entry = {"id": reference_id, "purpose": args.purpose or "", "required": bool(args.required), "notes": ""}
     if entry is None:
         references.append(new_entry)
     else:
@@ -206,10 +288,20 @@ def command_map(args: argparse.Namespace) -> int:
         entry.update(new_entry)
     references.sort(key=lambda item: str(item.get("id", "")))
     path = project_mapping_path(project)
+    plan = write_plan(
+        "reference.map",
+        [{"kind": "write-json", "target": str(path), "summary": f"在项目中映射参考 {reference_id}"}],
+        [path],
+    )
     if args.dry_run:
+        if emit_json_result(args, "reference.map", 0, dry_run=True, plan=plan, data={"mapping": mapping}):
+            return 0
         print(f"DryRun: would map {reference_id} in {path}")
         return 0
+    validate_apply_plan(args, plan)
     write_json_atomic(path, mapping)
+    if emit_json_result(args, "reference.map", 0, dry_run=False, plan=plan, data={"mapping": mapping}):
+        return 0
     print(f"Mapped {reference_id}: {path}")
     return 0
 
@@ -225,10 +317,20 @@ def command_unmap(args: argparse.Namespace) -> int:
     if len(mapping["references"]) == original:
         raise ReferenceLibraryError(f"Reference id is not mapped in project: {reference_id}")
     path = project_mapping_path(project)
+    plan = write_plan(
+        "reference.unmap",
+        [{"kind": "write-json", "target": str(path), "summary": f"从项目取消映射参考 {reference_id}"}],
+        [path],
+    )
     if args.dry_run:
+        if emit_json_result(args, "reference.unmap", 0, dry_run=True, plan=plan, data={"mapping": mapping}):
+            return 0
         print(f"DryRun: would unmap {reference_id} from {path}")
         return 0
+    validate_apply_plan(args, plan)
     write_json_atomic(path, mapping)
+    if emit_json_result(args, "reference.unmap", 0, dry_run=False, plan=plan, data={"mapping": mapping}):
+        return 0
     print(f"Unmapped {reference_id}; global clone was preserved.")
     return 0
 
@@ -241,13 +343,24 @@ def command_context(args: argparse.Namespace) -> int:
     catalogs = load_catalogs(root)
     content, required_missing = context_markdown(project, root, mapping, catalogs)
     output = resolve_context_output(project, args.output)
+    exit_code = 1 if required_missing else 0
+    plan = write_plan(
+        "reference.context",
+        [{"kind": "write-text", "target": str(output), "summary": "生成项目本地 Agent reference context"}],
+        [output],
+    )
     if args.dry_run:
+        if emit_json_result(args, "reference.context", exit_code, dry_run=True, plan=plan, data={"output": str(output), "content": content}):
+            return exit_code
         print(f"DryRun: would write reference context: {output}")
         print(content)
-        return 1 if required_missing else 0
+        return exit_code
+    validate_apply_plan(args, plan)
     write_text_atomic(output, content)
+    if emit_json_result(args, "reference.context", exit_code, dry_run=False, plan=plan, data={"output": str(output)}):
+        return exit_code
     print(f"Wrote reference context: {output}")
-    return 1 if required_missing else 0
+    return exit_code
 
 
 def command_status(args: argparse.Namespace, strict: bool) -> int:
@@ -255,22 +368,14 @@ def command_status(args: argparse.Namespace, strict: bool) -> int:
     root = library_root(config)
     catalogs = load_catalogs(root)
     rows, has_errors = status_rows(root, catalogs)
-    print(f"Config: {path}{'' if configured else ' (default, not written)'}")
-    print(f"Reference root: {root}")
-    print(f"Root exists: {str(root.is_dir()).lower()}")
     if strict and not root.is_dir():
         has_errors = True
-    if not rows:
-        print("References: 0")
-    for state in rows:
-        print(f"Reference {state['id']}: {state['status']} ({state['path']})")
-        for issue in state.get("issues", []):
-            print(f"  - {issue}")
 
+    mapped_ids = []
+    unresolved = []
     if args.project:
         project = require_project(args.project)
         mapping = load_project_mapping(project)
-        mapped_ids = []
         for entry in mapping["references"]:
             if not isinstance(entry, dict):
                 has_errors = True
@@ -278,21 +383,56 @@ def command_status(args: argparse.Namespace, strict: bool) -> int:
             reference_id = str(entry.get("id", ""))
             mapped_ids.append(reference_id)
             if reference_id not in catalogs:
-                print(f"Project reference {reference_id}: unresolved")
+                unresolved.append(reference_id)
                 if entry.get("required") or strict:
                     has_errors = True
+    exit_code = 1 if strict and has_errors else 0
+    if emit_json_result(
+        args,
+        "reference.doctor" if strict else "reference.status",
+        exit_code,
+        dry_run=False,
+        data={
+            "configPath": str(path),
+            "configured": configured,
+            "referenceRoot": str(root),
+            "rootExists": root.is_dir(),
+            "references": rows,
+            "projectMappings": mapped_ids,
+            "unresolved": unresolved,
+        },
+    ):
+        return exit_code
+    print(f"Config: {path}{'' if configured else ' (default, not written)'}")
+    print(f"Reference root: {root}")
+    print(f"Root exists: {str(root.is_dir()).lower()}")
+    if not rows:
+        print("References: 0")
+    for state in rows:
+        print(f"Reference {state['id']}: {state['status']} ({state['path']})")
+        for issue in state.get("issues", []):
+            print(f"  - {issue}")
+    for reference_id in unresolved:
+        print(f"Project reference {reference_id}: unresolved")
+    if args.project:
         print(f"Project mappings: {len(mapped_ids)}")
-    return 1 if strict and has_errors else 0
+    return exit_code
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="AWZ Reference Library")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    def add_contract_options(command: argparse.ArgumentParser, writable: bool = False) -> None:
+        command.add_argument("--json", dest="json_output", action="store_true", help="Emit the stable machine-readable result contract.")
+        if writable:
+            command.add_argument("--plan-hash", help="Apply only when this matches the prior DryRun planHash.")
+
     configure = subparsers.add_parser("configure", help="Configure the machine-level reference root.")
     configure.add_argument("--root", required=True)
     configure.add_argument("--depth", type=int, default=1)
     configure.add_argument("--dry-run", action="store_true")
+    add_contract_options(configure, writable=True)
     configure.set_defaults(handler=command_configure)
 
     add = subparsers.add_parser("add", help="Clone and register a public reference repository.")
@@ -309,13 +449,16 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("--canonical-url", help=argparse.SUPPRESS)
     add.add_argument("--allow-local", action="store_true", help=argparse.SUPPRESS)
     add.add_argument("--dry-run", action="store_true")
+    add_contract_options(add, writable=True)
     add.set_defaults(handler=command_add)
 
     list_parser = subparsers.add_parser("list", help="List registered references.")
+    add_contract_options(list_parser)
     list_parser.set_defaults(handler=command_list)
 
     show = subparsers.add_parser("show", help="Show one reference catalog and local state.")
     show.add_argument("--id", required=True)
+    add_contract_options(show)
     show.set_defaults(handler=command_show)
 
     for name, handler in (("map", command_map), ("unmap", command_unmap)):
@@ -326,20 +469,24 @@ def build_parser() -> argparse.ArgumentParser:
             command.add_argument("--purpose", default="")
             command.add_argument("--required", action="store_true")
         command.add_argument("--dry-run", action="store_true")
+        add_contract_options(command, writable=True)
         command.set_defaults(handler=handler)
 
     context = subparsers.add_parser("context", help="Generate project-local AI reference context.")
     context.add_argument("--project", required=True)
     context.add_argument("--output")
     context.add_argument("--dry-run", action="store_true")
+    add_contract_options(context, writable=True)
     context.set_defaults(handler=command_context)
 
     status = subparsers.add_parser("status", help="Show offline reference state.")
     status.add_argument("--project")
+    add_contract_options(status)
     status.set_defaults(handler=lambda args: command_status(args, strict=False))
 
     doctor = subparsers.add_parser("doctor", help="Run strict offline validation.")
     doctor.add_argument("--project")
+    add_contract_options(doctor)
     doctor.set_defaults(handler=lambda args: command_status(args, strict=True))
     return parser
 

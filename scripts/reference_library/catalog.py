@@ -73,15 +73,26 @@ def repo_path_from_catalog(root: Path, catalog: Dict[str, Any]) -> Path:
     return require_within(root / relative_path, root, "Repository path")
 
 
+def normalize_catalog(data: Dict[str, Any], path: Path) -> Dict[str, Any]:
+    schema_version = data.get("schemaVersion")
+    if schema_version not in (1, SCHEMA_VERSION):
+        raise ReferenceLibraryError(f"Unsupported catalog schemaVersion: {path}")
+    normalized = {**data}
+    normalized["schemaVersion"] = SCHEMA_VERSION
+    normalized.setdefault("notes", "")
+    normalized.setdefault("source", {"kind": "public-git"})
+    normalized.setdefault("createdAt", None)
+    normalized.setdefault("updatedAt", None)
+    return normalized
+
+
 def load_catalogs(root: Path) -> Dict[str, Dict[str, Any]]:
     catalog_dir = root / "catalog"
     if not catalog_dir.exists():
         return {}
     catalogs: Dict[str, Dict[str, Any]] = {}
     for path in sorted(catalog_dir.glob("*.json")):
-        data = read_json(path, "reference catalog")
-        if data.get("schemaVersion") != SCHEMA_VERSION:
-            raise ReferenceLibraryError(f"Unsupported catalog schemaVersion: {path}")
+        data = normalize_catalog(read_json(path, "reference catalog"), path)
         reference_id = validate_reference_id(str(data.get("id", "")))
         if reference_id in catalogs:
             raise ReferenceLibraryError(f"Duplicate reference id: {reference_id}")

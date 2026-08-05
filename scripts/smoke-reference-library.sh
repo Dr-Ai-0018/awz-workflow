@@ -58,6 +58,15 @@ bash "$reference_cli" configure --root "$library_root" --dry-run >/dev/null
 
 bash "$reference_cli" configure --root "$library_root" >/dev/null
 [[ -f "$config_dir/config.json" ]] || die 'configure did not write config'
+configure_plan=$(bash "$reference_cli" configure --root "$library_root" --dry-run --json)
+printf '%s\n' "$configure_plan" | grep -Fq '"operation": "reference.configure"' || die 'configure JSON operation is invalid'
+configure_plan_hash=$(printf '%s\n' "$configure_plan" | sed -n 's/^[[:space:]]*"planHash": "\([^"]*\)".*/\1/p')
+[[ -n "$configure_plan_hash" ]] || die 'configure JSON plan hash is missing'
+bash "$reference_cli" configure --root "$library_root" --json --plan-hash "$configure_plan_hash" >/dev/null
+grep -Fq '"schemaVersion": 2' "$config_dir/config.json" || die 'configure did not write schema v2'
+if bash "$reference_cli" configure --root "$library_root" --json >/dev/null 2>&1; then
+    die 'JSON apply accepted a missing plan hash'
+fi
 for directory in catalog repos context-cache logs; do
     [[ -d "$library_root/$directory" ]] || die "missing library directory: $directory"
 done

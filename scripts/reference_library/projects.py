@@ -22,9 +22,15 @@ def load_project_mapping(project: Path, allow_missing: bool = False) -> Dict[str
     if not path.exists() and allow_missing:
         return {"schemaVersion": SCHEMA_VERSION, "references": []}
     data = read_json(path, "project reference mapping")
-    if data.get("schemaVersion") != SCHEMA_VERSION or not isinstance(data.get("references"), list):
+    if data.get("schemaVersion") not in (1, SCHEMA_VERSION) or not isinstance(data.get("references"), list):
         raise ReferenceLibraryError(f"Invalid project reference mapping schema: {path}")
-    return data
+    normalized = {**data, "schemaVersion": SCHEMA_VERSION, "references": []}
+    for entry in data["references"]:
+        if not isinstance(entry, dict):
+            normalized["references"].append(entry)
+            continue
+        normalized["references"].append({**entry, "notes": entry.get("notes", "")})
+    return normalized
 
 
 def require_project(value: str) -> Path:
