@@ -220,6 +220,7 @@ root_files=(
 
 local_dirs=(
     'docs'
+    'docs/references'
     'docs/agent-room'
     'docs/agent-room/guides'
     'docs/agent-room/handoffs'
@@ -237,7 +238,8 @@ local_dirs=(
 )
 
 local_files=(
-    'docs-layout.md|docs/README.md|false'
+    'docs-layout.md|docs/README.md|false|false'
+    'references-layout.md|docs/references/README.md|false|true'
     'agent-onboarding.md|docs/agent-room/onboarding.md|false'
     'room-ledger.py|docs/agent-room/room-ledger.py|false'
     'guides/collaboration.md|docs/agent-room/guides/collaboration.md|false'
@@ -249,7 +251,7 @@ local_files=(
     'guides/blockers-and-safety.md|docs/agent-room/guides/blockers-and-safety.md|false'
     'guides/review.md|docs/agent-room/guides/review.md|false'
     'guides/room-ledger.md|docs/agent-room/guides/room-ledger.md|false'
-    'agent-status.template.md|docs/agent-room/status.md|true'
+    'agent-status.template.md|docs/agent-room/status.md|true|true'
     'handoff.template.md|docs/agent-room/handoffs/handoff.template.md|false'
     'review-checklist.template.md|docs/agent-room/reviews/review-checklist.template.md|false'
     'decision-record.template.md|docs/agent-room/decisions/decision-record.template.md|false'
@@ -278,8 +280,8 @@ for dir in "${local_dirs[@]}"; do
 done
 
 for file in "${local_files[@]}"; do
-    IFS='|' read -r source dest render <<< "$file"
-    write_generated_file "$source" "$dest" "$render"
+    IFS='|' read -r source dest render protect_in_existing <<< "$file"
+    write_generated_file "$source" "$dest" "$render" "$protect_in_existing"
 done
 
 if [[ "$needs_git_init" == true ]]; then

@@ -13,9 +13,10 @@
 
 1. `AGENTS.md`：读取本项目硬规则、仓库边界、Git 禁区和工具默认值。
 2. `CLAUDE.md`：如果当前 Agent 是 Claude Code，确认是否导入了 `AGENTS.md` 和额外限制。
-3. `README.md`：理解项目目标、运行方式、公开约定。
-4. `docs/agent-room/status.md`：理解当前阶段、owner、阻塞项和下一步。
-5. 根据任务类型读取补充材料。
+3. `README.md`：理解公开项目目标、运行方式和共享约定。
+4. `docs/references/README.md`：理解稳定背景、目标边界、术语、约束和资料来源。
+5. `docs/agent-room/status.md`：理解当前阶段、owner、dirty state、阻塞项和下一步。
+6. 根据任务类型读取补充材料。
 
 ## 任务类型到文档映射
 
@@ -57,8 +58,9 @@ review、audit、debug、hardening：
 
 第三方参考源码、方案借鉴、AI context：
 
+- `docs/references/README.md`
 - `.awz/references.json`
-- `docs/agent-room/reference-context.md`（存在时）
+- `docs/references/reference-context.md`（存在时）
 - `workflows/reference-library.md`
 
 需求、偏好、边界规则不确定：
@@ -79,6 +81,21 @@ Owner：
 ```
 
 小任务可以不写完整回执，但最终回复仍要说明读了哪些关键上下文、跑了哪些验证。
+
+## 信息归属与单一来源
+
+| 内容 | 应放位置 | 不应复制到 |
+| --- | --- | --- |
+| 始终生效的 Agent 硬边界 | `AGENTS.md` | 多个 guide |
+| 公开目标、安装、运行、测试命令 | `README.md` 或正式文档 | status、handoff |
+| 本地稳定背景、约束、术语、资料证据 | `docs/references/README.md` | status、notes |
+| 当前阶段、owner、dirty state、阻塞项 | `docs/agent-room/status.md` | README、长期背景副本 |
+| 特定任务的操作方法 | `docs/agent-room/guides/` | `AGENTS.md` 全量复制 |
+| 阶段计划与验收项 | `docs/plans/` 或 `docs/agent-room/reviews/` | room 普通聊天 |
+| 方案取舍及原因 | decision/ADR | 代码注释长篇复述 |
+| 可清理产物、截图、实验与日志 | `temp/` | docs 正文、git |
+
+同一规则出现两次时，保留离执行位置最近且职责最稳定的一份，其余位置只留链接。规则已能通过 lint、test、schema 或脚本强制时，文档保留意图与入口，不复制实现细节。
 
 ## 防止过载
 

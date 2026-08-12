@@ -146,9 +146,11 @@ bash "$reference_cli" unmap --project "$project_path" --id required-missing >/de
 rm -f "$library_root/catalog/required-missing.json"
 
 bash "$reference_cli" context --project "$project_path" --dry-run >/dev/null
-context_path="$project_path/docs/agent-room/reference-context.md"
+context_path="$project_path/docs/references/reference-context.md"
+legacy_context_path="$project_path/docs/agent-room/reference-context.md"
 [[ ! -e "$context_path" ]] || die 'context dry-run wrote output'
 bash "$reference_cli" context --project "$project_path" >/dev/null
+[[ ! -e "$legacy_context_path" ]] || die 'context wrote the legacy agent-room path'
 grep -Fq 'Fixture Reference' "$context_path" || die 'context did not include mapped reference'
 
 bash "$reference_cli" status --project "$project_path" >/dev/null

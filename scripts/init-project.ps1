@@ -202,6 +202,7 @@ $rootFiles = @(
 
 $localDirs = @(
     "docs",
+    "docs/references",
     "docs/agent-room",
     "docs/agent-room/guides",
     "docs/agent-room/handoffs",
@@ -219,7 +220,8 @@ $localDirs = @(
 )
 
 $localFiles = @(
-    @{ Source = "docs-layout.md"; Dest = "docs/README.md"; Render = $false },
+    @{ Source = "docs-layout.md"; Dest = "docs/README.md"; Render = $false; ProtectInExisting = $false },
+    @{ Source = "references-layout.md"; Dest = "docs/references/README.md"; Render = $false; ProtectInExisting = $true },
     @{ Source = "agent-onboarding.md"; Dest = "docs/agent-room/onboarding.md"; Render = $false },
     @{ Source = "room-ledger.py"; Dest = "docs/agent-room/room-ledger.py"; Render = $false },
     @{ Source = "guides/collaboration.md"; Dest = "docs/agent-room/guides/collaboration.md"; Render = $false },
@@ -231,7 +233,7 @@ $localFiles = @(
     @{ Source = "guides/blockers-and-safety.md"; Dest = "docs/agent-room/guides/blockers-and-safety.md"; Render = $false },
     @{ Source = "guides/review.md"; Dest = "docs/agent-room/guides/review.md"; Render = $false },
     @{ Source = "guides/room-ledger.md"; Dest = "docs/agent-room/guides/room-ledger.md"; Render = $false },
-    @{ Source = "agent-status.template.md"; Dest = "docs/agent-room/status.md"; Render = $true },
+    @{ Source = "agent-status.template.md"; Dest = "docs/agent-room/status.md"; Render = $true; ProtectInExisting = $true },
     @{ Source = "handoff.template.md"; Dest = "docs/agent-room/handoffs/handoff.template.md"; Render = $false },
     @{ Source = "review-checklist.template.md"; Dest = "docs/agent-room/reviews/review-checklist.template.md"; Render = $false },
     @{ Source = "decision-record.template.md"; Dest = "docs/agent-room/decisions/decision-record.template.md"; Render = $false },
@@ -261,7 +263,7 @@ foreach ($dir in $localDirs) {
 }
 
 foreach ($file in $localFiles) {
-    Write-GeneratedFile -SourceName $file.Source -DestName $file.Dest -Render:([bool]$file.Render)
+    Write-GeneratedFile -SourceName $file.Source -DestName $file.Dest -Render:([bool]$file.Render) -ProtectInExisting:([bool]$file.ProtectInExisting)
 }
 
 if ($needsGitInit) {

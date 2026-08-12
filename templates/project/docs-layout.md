@@ -1,49 +1,33 @@
-# 本地 docs/ 结构
+# 本地 docs/ 导航
 
-`docs/` 默认被 git 忽略。它是本地协作工作台，不是公开文档目录。
-
-推荐结构：
+`docs/` 默认被 git 忽略，是本地项目知识与协作工作台。进入后先按内容寿命选择位置，不要把所有东西都塞进 `agent-room/`。
 
 ```text
 docs/
+├─ references/
+│  ├─ README.md                 # 稳定项目背景、约束和资料索引
+│  └─ reference-context.md      # Reference Library 生成，可再生
 ├─ agent-room/
-│  ├─ status.md
-│  ├─ room.ndjson
-│  ├─ room-ledger.py
+│  ├─ onboarding.md             # 任务到 guide 的路由
+│  ├─ status.md                 # 当前阶段与 owner 快照
+│  ├─ room.ndjson               # append-only 协作时间线
+│  ├─ room-ledger.py            # 时间线唯一写入入口
 │  ├─ guides/
 │  ├─ handoffs/
 │  ├─ reviews/
 │  ├─ decisions/
 │  └─ notes/
-└─ plans/
+└─ plans/                       # 阶段计划与 checklist
 ```
 
-使用规则：
+## 放置规则
 
-- `agent-room/status.md` 记录当前阶段、owner、阻塞项和下一步；
-- `agent-room/room.ndjson` 是受锁保护的 append-only 协作时间线；
-- `agent-room/room-ledger.py` 是唯一的时间线追加入口；
-- `agent-room/guides/` 按任务类型保存分层指导；
-- `agent-room/handoffs/` 放跨 Agent 交接；
-- `agent-room/reviews/` 放 P0/P1/P2/P3 checklist；
-- `agent-room/decisions/` 放本地 ADR 草稿和方案对比；
-- `agent-room/notes/` 放调研摘记和待确认想法；
-- `plans/` 放任务计划、版本计划和实现 checklist。
+- “这个项目长期是什么、为什么这样、结论来自哪里”：`references/`。
+- “现在谁在做什么、哪里卡住”：`agent-room/status.md`。
+- “本轮任务怎么推进”：`plans/` 或 `agent-room/reviews/`。
+- “Agent 之间需要追溯的消息”：通过 `room-ledger.py` 追加到 `room.ndjson`。
+- “可清理的大文件或生成物”：放 `temp/`，只在这里留下索引。
 
-初始化脚本会在对应目录放入轻量模板：
+## 持久化边界
 
-- `agent-room/guides/collaboration.md`
-- `agent-room/guides/room-ledger.md`
-- `agent-room/guides/repository-hygiene.md`
-- `agent-room/guides/git-workflow.md`
-- `agent-room/guides/verification.md`
-- `agent-room/guides/code-architecture.md`
-- `agent-room/guides/frontend.md`
-- `agent-room/guides/blockers-and-safety.md`
-- `agent-room/guides/review.md`
-- `agent-room/handoffs/handoff.template.md`
-- `agent-room/reviews/review-checklist.template.md`
-- `agent-room/decisions/decision-record.template.md`
-- `plans/release-checklist.template.md`
-
-重要结论不要只留在 ignored `docs/`。需要进入长期项目历史的内容，应沉淀到代码、README、公开文档、issue/PR 或正式 ADR。
+`docs/` 是本地层。稳定结论若需要跨机器或跨成员共享，应提升到代码、README、正式文档、ADR、issue 或 PR。不要在 references、status、handoff 和 notes 中维护同一事实的多个副本。

@@ -14,6 +14,7 @@
 - Windows `awz.bat` / `awz.ps1` 与 POSIX `awz.sh` 终端交互入口。
 - TUI 的强制 DryRun、确认执行、脚本化参数和跨平台 smoke 覆盖。
 - Reference Library 的项目映射、离线状态检查、结构化 plan/result 和跨平台管理入口。
+- 初始化项目新增统一的 `docs/references/` 背景与资料入口，Reference Library context 同目录生成。
 
 ### Fixed
 
@@ -24,12 +25,14 @@
 - 已有项目模式即使使用 `Force` 也会保留项目自有的 `.gitignore`、`.env.example`、`README.md` 和 `LICENSE`。
 - Reference Library 的计划 hash 绑定 validated inputs，损坏 Git 目录不再误判为健康仓库，所有可展示 URL 均拒绝凭据。
 - Release 打包会排除 Python `__pycache__`、`.pyc` 与 `.pyo` 本机缓存。
+- `Existing -Force` 不再覆盖项目持续维护的 `docs/references/README.md` 与 `docs/agent-room/status.md`。
 
 ### Changed
 
 - 精简发布工作流中的历史实施叙述，改为当前发布基线与后续发布流程。
+- 收敛初始化项目的 `AGENTS.md` 为硬规则和阅读路由，详细工具、架构与前端规则按需从 guides 加载。
 - PowerShell 与 POSIX 初始化器统一为 `New`/`Existing` 双模式，并在首次写入前校验完整模板集。
-- Windows TUI 从编号提示升级为全屏方向键状态机，增加分步表单、滚动预览和完成/错误页面。
+- Windows TUI 收敛为编号选择与原生单行输入的分步终端向导，保留 DryRun、危险确认、完整日志和完成/错误页面。
 
 ## [0.2.0] - 2026-07-12
 

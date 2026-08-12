@@ -1,20 +1,19 @@
 # Agent Onboarding
 
-本文件引导新进入项目的 AI Agent 了解本项目规则。它位于 ignored `docs/agent-room/`，默认不进 git。
+本文件是任务路由图，位于 ignored `docs/agent-room/`。首次进入先按根目录 `AGENTS.md` 的短链读取项目事实与当前状态，再从这里按任务类型加载细则。
 
-## 先读这些
+## 基础阅读链
 
-1. `AGENTS.md`：本地 Agent 硬规则。
-2. `CLAUDE.md`：Claude Code 入口，通常导入 `AGENTS.md`。
-3. `README.md`：项目目标和公开运行方式。
-4. `docs/agent-room/status.md`：当前阶段、owner、阻塞项和下一步。
+1. `AGENTS.md`：始终生效的硬规则和信息边界。
+2. `README.md`：公开项目目标、用法和已验证命令。
+3. `docs/references/README.md`：稳定背景、目标、非目标、术语、约束和资料来源。
+4. `docs/agent-room/status.md`：当前阶段、owner、dirty state、阻塞项和下一步。
 
 ## 按任务继续读
 
-初始化、仓库整理、工具选择：
+仓库整理、工具选择或初始化接入：
 
 - `docs/README.md`
-- `temp/README.md`
 - `docs/agent-room/guides/repository-hygiene.md`
 - `docs/agent-room/guides/verification.md`
 
@@ -41,11 +40,12 @@ review、debug、hardening：
 - `docs/agent-room/guides/frontend.md`
 - `docs/agent-room/guides/verification.md`
 
-参考项目、第三方源码借鉴：
+外部资料或第三方源码借鉴：
 
+- `docs/references/README.md`
 - `.awz/references.json`
-- `docs/agent-room/reference-context.md`（存在时）
-- 先按 mapping 和 `readFirst` 定向读取，不扫描整个机器级参考库
+- `docs/references/reference-context.md`（由 Reference Library 生成且存在时）
+- 只按用途和 `readFirst` 定向读取，不扫描整个机器级参考库
 
 Git、分支、commit、版本：
 
@@ -59,25 +59,16 @@ Git、分支、commit、版本：
 
 方案选择或架构取舍：
 
+- `docs/references/README.md`
 - `docs/agent-room/guides/code-architecture.md`
 - `docs/agent-room/decisions/decision-record.template.md`
 
-## 回写要求
+## 回写位置
 
-较大任务开始前，在 `docs/agent-room/status.md` 或 handoff 中写清：
+- 稳定项目事实与资料来源：更新 `docs/references/README.md`；适合共享的内容再提升到公开文档。
+- 当前阶段、owner、阻塞项：更新 `docs/agent-room/status.md`。
+- 跨 Agent 交接：写入 `docs/agent-room/handoffs/`。
+- 多步骤 review：维护 `docs/agent-room/reviews/` checklist。
+- 普通 room 时间线：只能使用 `room-ledger.py append`，不要为每轮聊天新建文件。
 
-```text
-已读：
-任务理解：
-范围：
-Owner：
-验证计划：
-未确认问题：
-```
-
-小任务可以不写完整回执，但最终交接仍要说明关键上下文和验证结果。
-
-## 注意
-
-- 不要机械读取所有文件来制造上下文噪音。
-- 不要把重要结论只留在 ignored `docs/`；需要长期保存的内容要沉淀到可提交文件、issue/PR 或正式文档。
+不要机械读取所有文件，也不要把背景事实复制到 status、handoff 和多个 guide 中形成互相漂移的副本。

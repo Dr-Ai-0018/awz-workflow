@@ -39,9 +39,11 @@ bash "$initializer" --target "$smoke_path" --name "AWZ Init Smoke"
 [[ -d "$smoke_path/.git" ]] || die 'Git repository was not initialized'
 [[ "$(git -C "$smoke_path" symbolic-ref --short HEAD)" == 'main' ]] || die 'Git branch is not main'
 
-for path in AGENTS.md CLAUDE.md docs docs/agent-room/room-ledger.py docs/agent-room/guides/room-ledger.md temp .env; do
+for path in AGENTS.md CLAUDE.md docs docs/references/README.md docs/agent-room/room-ledger.py docs/agent-room/guides/room-ledger.md temp .env; do
     git -C "$smoke_path" check-ignore -q -- "$path" || die "$path should be ignored"
 done
+
+grep -Fq 'docs/references/README.md' "$smoke_path/AGENTS.md" || die 'AGENTS.md does not expose the reference index entry'
 
 if git -C "$smoke_path" check-ignore -q -- .env.example; then
     die '.env.example must remain trackable'
@@ -62,12 +64,16 @@ bash "$initializer" --target "$smoke_path" --mode existing
 
 printf '%s\n' 'custom local AGENTS' > "$smoke_path/AGENTS.md"
 printf '%s\n' '{"schemaVersion":1,"references":[{"id":"custom"}]}' > "$smoke_path/.awz/references.json"
+printf '%s\n' 'custom project context' > "$smoke_path/docs/references/README.md"
+printf '%s\n' 'custom project status' > "$smoke_path/docs/agent-room/status.md"
 bash "$initializer" --target "$smoke_path" --mode existing --force
 [[ "$(<"$smoke_path/README.md")" == 'custom local README' ]] || die '--force overwrote a protected project README'
 if grep -Fq 'custom local AGENTS' "$smoke_path/AGENTS.md"; then
     die '--force did not refresh AWZ-managed AGENTS.md'
 fi
 grep -Fq '"id":"custom"' "$smoke_path/.awz/references.json" || die '--force overwrote project-owned .awz/references.json'
+grep -Fq 'custom project context' "$smoke_path/docs/references/README.md" || die '--force overwrote project-owned docs/references/README.md'
+grep -Fq 'custom project status' "$smoke_path/docs/agent-room/status.md" || die '--force overwrote project-owned status.md'
 
 mkdir -p "$occupied_path"
 printf '%s\n' 'preserve me' > "$occupied_path/valuable.txt"

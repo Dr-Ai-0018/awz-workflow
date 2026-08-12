@@ -91,6 +91,7 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
       ├─ AGENTS.md
       ├─ CLAUDE.md
       ├─ agent-onboarding.md
+      ├─ references-layout.md
       ├─ room-ledger.py
       ├─ guides/
       ├─ agent-status.template.md
@@ -127,11 +128,11 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 
 Reference Library 把 GSAP 这类长期参考源码放在业务项目之外，通过可提交的 `.awz/references.json` 映射给具体项目。Windows 默认优先 `D:\AWZ References`，没有 D 盘时回退 `%USERPROFILE%\AWZ References`；本机可以显式配置其他位置。
 
-初始化器只生成空 mapping 和阅读说明，不联网、不 clone。参考库的 configure、add、map、context 和 doctor 使用独立命令，详见 [参考项目库工作流](workflows/reference-library.md)。
+初始化器只生成空 mapping 和 `docs/references/README.md` 背景/资料入口，不联网、不 clone。`context` 默认把本机解析结果写入同目录的 `reference-context.md`；真实第三方源码始终位于业务项目之外。参考库的 configure、add、map、context 和 doctor 使用独立命令，详见 [参考项目库工作流](workflows/reference-library.md)。
 
 ## 终端交互入口
 
-Windows 推荐直接运行 BAT。它会使用 `-NoProfile` 启动 PowerShell，并进入全屏界面：
+Windows 推荐直接运行 BAT。它会使用 `-NoProfile` 启动 PowerShell，并进入分步终端向导：
 
 ```powershell
 .\scripts\awz.bat

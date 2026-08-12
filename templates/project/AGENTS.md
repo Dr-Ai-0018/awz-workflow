@@ -1,111 +1,49 @@
 # AGENTS.md
 
-本项目遵循 AWZ Workflow。
+本项目遵循 AWZ Workflow。本文件是 Agent 的唯一入口，只保留始终生效的硬规则；任务细则按需读取，不要一次性加载全部文档。
 
-## 核心规则
+## 首次进入
 
-- 先读相关代码，再编辑。
-- 改动保持小步、可 review。
-- 不碰无关 dirty files。
-- 能跑真实验证就跑真实验证。
-- 如果无法验证，要说明原因。
-- 不打印、不提交、不暴露 secrets。
+1. 读 `README.md`，确认项目目标、公开用法和已验证命令。
+2. 读 `docs/references/README.md`，确认项目背景、边界、术语、约束和资料来源。
+3. 读 `docs/agent-room/status.md`，确认当前阶段、owner、dirty state、阻塞项和下一步。
+4. 不熟悉项目或任务较大时，再读 `docs/agent-room/onboarding.md`，按任务类型加载对应 guide。
+5. 编辑前检查真实代码、`git status` 和现有验证入口，不从模板占位或旧 handoff 猜现状。
 
-## 阅读顺序
+## 硬规则
 
-- 先读本文件，再读 `README.md` 和 `docs/agent-room/status.md`。
-- 新 Agent 进入项目时，读 `docs/agent-room/onboarding.md`。
-- 按任务类型读取 `docs/agent-room/guides/` 下的对应指南。
-- 多 Agent 协作时，读 `docs/agent-room/guides/collaboration.md`、`docs/agent-room/handoffs/` 和当前 owner 表。
-- 共享 room 时间线时，读 `docs/agent-room/guides/room-ledger.md`，并使用 `docs/agent-room/room-ledger.py` 追加。
-- review/debug/hardening 时，读 `docs/agent-room/guides/review.md`，并读或创建 `docs/agent-room/reviews/` 下的 checklist。
-- 不要机械读取所有文件；按任务类型扩展上下文。
+- 先理解再编辑；改动小步、可 review，不碰无关 dirty files。
+- 重要判断以当前代码、配置、命令输出和用户确认优先，不把旧记录当作现状。
+- 能运行真实验证就运行；无法验证时说明未验证项、原因和风险。
+- 不打印、提交或完整复述 secret、token、cookie、私有 URL 和真实 `.env`。
+- 默认不提交 `.codex/`、`.claude/`、`.vscode/`、`AGENTS.md`、`CLAUDE.md`、`docs/`、`temp/`、`.env` 或 `.env.*`；`.env.example` 应保持可提交且只含示例值。
+- CAPTCHA、MFA、password、secret rotation、破坏性数据操作、大范围架构重写、新增 heavyweight production dependency 时停下等待用户。
+- 重要结论不能只留在 ignored 本地文档；需要长期共享时提升到代码、README、正式文档、ADR、issue 或 PR。
 
-## 参考项目
+## 信息边界
 
-- 项目 reference mapping 位于可提交的 `.awz/references.json`。
-- 如果存在 `docs/agent-room/reference-context.md`，只在当前任务命中其用途时读取对应 reference。
-- 先读 reference 的 `readFirst`，不要递归扫描整个机器级参考库。
+- `README.md`：公开且持久的项目目标、安装、运行和验证入口。
+- `docs/references/`：本地稳定项目背景、人工资料索引和生成的 Reference Library context，不记录每日任务进度，也不存放第三方 clone。
+- `docs/agent-room/`：当前状态、owner、handoff、review、决策草稿和 append-only room ledger。
+- `docs/plans/`：阶段计划与 checklist。
+- `temp/`：可清理的任务产物、实验、日志和截图。
+- `.awz/references.json`：可提交、机器无关的外部源码 reference 映射。
+
+## Reference 使用
+
+- 先读 `docs/references/README.md`；存在 `docs/references/reference-context.md` 时，只按任务用途读取命中的 reference。
+- 先读 reference 的 `readFirst`，不要递归扫描机器级参考库。
 - reference 默认是 `source-only` 外部代码；不要自动安装、构建、执行或复制非平凡代码。
-- reference 只能提供思路和证据，最终实现必须遵循当前项目 contract 与 license。
+- reference 只提供思路和证据，最终实现必须遵循当前项目 contract 与 license。
 
-## 本地路径
+## 协作与 Git
 
-永远不要提交：
+- 多 Agent 协作先读 status 的 owner 表；不要擅自编辑其他 Agent 的范围。
+- `room.ndjson` 只能通过 `docs/agent-room/room-ledger.py append` 写入；历史修正只能追加 `amend`。
+- 默认分支为 `main`；中大型阶段使用短生命周期 topic branch；commit 按 logical change 切分。
+- 禁止 AI attribution，使用环境中已有的 git 用户名和邮箱。
+- commit 格式：`type: 中文一句话概括`，body 使用 `1. **关键词**：具体改动点`。
 
-- `.codex/`
-- `.claude/`
-- `.vscode/`
-- `AGENTS.md`
-- `CLAUDE.md`
-- `.env`
-- `.env.*`
-- `docs/`
-- `temp/`
+## 任务细则
 
-应该提交：
-
-- `.env.example`
-
-注意：`AGENTS.md` 和 `CLAUDE.md` 是本地 Agent 指令文件，初始化会生成，但默认不进 git。
-
-## Agent 交流区
-
-- 默认使用 ignored `docs/agent-room/` 作为 Agent 共享交流区。
-- `status.md` 记录当前阶段、owner、阻塞项和下一步。
-- `handoffs/` 存放跨 Agent 交接。
-- `reviews/` 存放 P0/P1/P2/P3 checklist。
-- `room.ndjson` 是 append-only 时间线；禁止用 `apply_patch`、通用分隔符或署名定位追加，历史修正只能追加 `amend`。
-- 重要结论要沉淀到可提交文件、issue/PR 或正式文档，不要只留在 ignored `docs/`。
-
-## 工具默认值
-
-- Python：优先 `uv`；涉及部署时兼容 `venv`。
-- Node/frontend：优先 `pnpm`；涉及部署时兼容 `npm`。
-- 小项目不默认生成 `pyproject.toml` 或 `package.json`。
-- 小项目默认不需要 Docker。
-- Docker、CI、部署流在项目规模需要时再加。
-
-## 文件搜索
-
-- 跨目录、跨盘、面向未知位置的文件定位，优先走本机 Everything HTTP API：`http://localhost:8080/?search=<QUERY>&json=1&count=<N>`。
-- 不要用 `Get-ChildItem -Recurse` / `find` 去扫全盘或大目录树，数量级更慢，且会漏掉权限受限的路径。
-- Everything 探测不到（服务未开、非 Windows/NTFS 环境）再回退到语言原生工具。
-- 常用查询语法、探测和回退顺序见 `docs/agent-room/guides/verification.md`。
-
-## Git
-
-- 默认分支：`main`。
-- 使用环境里配置好的 git 用户名和邮箱。
-- 禁止 AI attribution。
-- 中大型阶段或多 Agent 协作用短生命周期 topic branch，完成后合并回 `main`。
-- commit 按 logical change 切分，不要过碎，也不要把无关主题塞成一个大 commit。
-- commit 格式：
-
-```text
-type: 中文一句话概括
-
-1. **关键词**：具体改动点
-```
-
-## 架构
-
-- 不要把整个项目塞进一个巨型文件。
-- 不要拆成没有意义的小文件。
-- 复杂度上来后按责任拆分。
-- 大文件或高复杂度例外必须解释。
-
-## 前端
-
-- 避免通用 AI 味 UI。
-- 先建立基础 UI 样式，再搭页面。
-- 统一 buttons、inputs、modals、toasts、scrollbars、typography、focus states。
-- 能用真实浏览器时优先真实浏览器预览。
-
-## 必须停下等用户的情况
-
-- CAPTCHA/MFA/password；
-- destructive 文件或数据库操作；
-- secret rotation；
-- 大范围架构重写；
-- 新增 heavyweight production dependency。
+任务到 guide、review checklist、handoff、decision 和 release 文档的完整路由见 `docs/agent-room/onboarding.md`。

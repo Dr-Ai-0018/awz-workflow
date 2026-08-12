@@ -58,7 +58,7 @@ Windows 的阶段面板、中文宽度计算、编号选择与预览呈现集中
 .\scripts\awz.ps1 -RenderDemo
 ```
 
-POSIX `awz.sh` 当前保留引导式交互与相同安全语义；后续再对齐全屏渲染，不在两种 shell 中复制底层初始化逻辑。
+POSIX `awz.sh` 当前保留引导式交互与相同安全语义；后续只对齐分步信息层级、预览和结果呈现，不在两种 shell 中复制底层初始化逻辑，也不把逐键全屏重绘作为目标。
 
 ## 安全不变量
 
@@ -134,7 +134,7 @@ TUI 后续按独立 action/subcommand 扩展：
 
 1. `doctor`：检查 Git、PowerShell/Bash、uv、pnpm 等环境能力，只报告不安装。
 2. `refresh`：基于 manifest hash 展示 AWZ 管理文件差异，再选择 apply。
-3. `plan --json`：输出机器可读变更计划，供更完整的全屏 TUI 或其他前端消费。
+3. `plan --json`：输出机器可读变更计划，供更完整的终端向导或其他前端消费。
 4. 技术栈初始化：仅在用户明确选择 Python/Node 等类型后调用独立脚手架，不并入通用 init。
 
 新增 action 不能扩大 `init` 权限，也不能通过交互层绕开底层脚本的安全边界。

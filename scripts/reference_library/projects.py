@@ -103,7 +103,7 @@ def resolve_context_output(project: Path, output_value: Optional[str]) -> Path:
         requested_output = Path(os.path.expandvars(output_value)).expanduser()
         output = resolved_path(str(requested_output if requested_output.is_absolute() else project / requested_output))
     else:
-        output = project / "docs" / "agent-room" / "reference-context.md"
+        output = project / "docs" / "references" / "reference-context.md"
     if not is_within(output, project):
         raise ReferenceLibraryError(f"Context output must stay inside the project: {output}")
     return output

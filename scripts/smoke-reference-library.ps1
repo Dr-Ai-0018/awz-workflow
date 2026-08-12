@@ -161,9 +161,11 @@ try {
     Remove-Item -LiteralPath (Join-Path $libraryRoot "catalog/required-missing.json") -Force
 
     Invoke-Reference -Arguments @("context", "--project", $projectPath, "--dry-run") | Out-Null
-    $contextPath = Join-Path $projectPath "docs/agent-room/reference-context.md"
+    $contextPath = Join-Path $projectPath "docs/references/reference-context.md"
+    $legacyContextPath = Join-Path $projectPath "docs/agent-room/reference-context.md"
     Assert-True (-not (Test-Path -LiteralPath $contextPath)) "context dry-run wrote output"
     Invoke-Reference -Arguments @("context", "--project", $projectPath) | Out-Null
+    Assert-True (-not (Test-Path -LiteralPath $legacyContextPath)) "context wrote the legacy agent-room path"
     Assert-True ((Get-Content -LiteralPath $contextPath -Raw).Contains("Fixture Reference")) "context did not include mapped reference"
 
     Invoke-Reference -Arguments @("status", "--project", $projectPath) | Out-Null

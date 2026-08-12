@@ -32,7 +32,8 @@
 
 - 根目录 `AGENTS.md` 和 `CLAUDE.md` 被 git 忽略，用来给本地 AI Agent 读取。
 - 本地 `docs/` 被 git 忽略，用来写计划、debug、AI 协作记录。
-- 本地 `docs/agent-room/` 是 Agent 交流区，用来放状态板、handoff、review checklist 和决策草稿。
+- 本地 `docs/references/` 统一保存稳定项目背景、资料索引和可再生 reference context。
+- 本地 `docs/agent-room/` 只保存当前协作状态、handoff、review checklist、决策草稿和 append-only 时间线。
 - 本地 `temp/` 被 git 忽略，用来放结构化临时产物。
 - `.env` 被忽略；`.env.example` 进 git，但只能放示例值。
 - AI 工具必须遵循 `AGENTS.md`。

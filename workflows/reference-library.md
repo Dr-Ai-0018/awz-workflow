@@ -48,6 +48,17 @@ AWZ References/
 
 初始化器生成空映射，但不会创建外部参考库、修改机器级配置、联网或 clone。已有项目中的 `.awz/references.json` 视为项目自有文件，即使 `Existing -Force` 也不能覆盖。
 
+## 项目内的 Reference 信息架构
+
+项目内只保留一个本地入口 `docs/references/`，统一承载稳定背景和参考资料：
+
+- `docs/references/README.md`：人工维护的项目背景、目标、约束、术语和资料索引；
+- `.awz/references.json`：可提交、机器无关的外部源码映射；
+- `docs/references/reference-context.md`：由 `context` 生成的本机解析结果，可随时再生成；
+- 真实第三方 clone：始终位于项目外的机器级 Reference Library。
+
+当前任务状态、owner 和 handoff 不属于 reference，继续放在 `docs/agent-room/`。大文件、截图和导出物放 `temp/`，只在资料索引中记录来源与用途。
+
 ## 首版命令
 
 Windows：
@@ -91,7 +102,7 @@ bash scripts/reference-library.sh list
 
 ## AI 阅读规则
 
-`context` 根据当前项目映射生成 ignored `docs/agent-room/reference-context.md`，内容包括：
+`context` 根据当前项目映射生成 ignored `docs/references/reference-context.md`，内容包括：
 
 - reference 的用途、tags、useWhen 和 avoidWhen；
 - 本机解析路径；

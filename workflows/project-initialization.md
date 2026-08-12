@@ -17,9 +17,10 @@
 2. `-Force` / `--force` 不能绕过 `New` 模式，只能与显式 `Existing` 模式组合使用。
 3. `Existing` 模式默认保留已有文件，只补充缺失基线；force 只刷新 AWZ 管理的本地指导文件。
 4. 已有项目的 `.gitignore`、`.env.example`、`README.md`、`LICENSE` 永远视为项目自有文件，即使指定 force 也不能覆盖。
-5. `Existing` 模式不能指向不存在的目录，避免把参数写错后静默创建成新项目。
-6. 所有模板、目标类型、模式和 `git` 前置条件必须在首次写入前完成校验。
-7. 执行已有项目模式前必须先跑 DryRun，并 review 将写入、跳过或覆盖的清单。
+5. `docs/references/README.md` 与 `docs/agent-room/status.md` 是项目持续维护的本地上下文，即使指定 force 也只能在缺失时创建，不能用空模板覆盖。
+6. `Existing` 模式不能指向不存在的目录，避免把参数写错后静默创建成新项目。
+7. 所有模板、目标类型、模式和 `git` 前置条件必须在首次写入前完成校验。
+8. 执行已有项目模式前必须先跑 DryRun，并 review 将写入、跳过或覆盖的清单。
 
 默认新项目示例：
 
@@ -54,6 +55,7 @@ scripts\init-project.bat -TargetPath "E:\Project\Example" -ProjectName "Example"
 - 本地 ignored `AGENTS.md`；
 - 本地 ignored `CLAUDE.md`，并导入 `AGENTS.md`；
 - 本地 ignored `docs/`；
+- 本地 ignored `docs/references/README.md`，统一保存稳定项目背景、约束和资料索引；
 - 本地 ignored `temp/`；
 - 可提交 `.awz/references.json`，默认没有任何映射；
 - license，默认 MIT；
@@ -81,14 +83,6 @@ scripts\init-project.bat -TargetPath "E:\Project\Example" -ProjectName "Example"
 .env.*
 !.env.example
 docs/
-docs/agent-room/
-docs/agent-room/onboarding.md
-docs/agent-room/guides/
-docs/agent-room/handoffs/
-docs/agent-room/reviews/
-docs/agent-room/decisions/
-docs/agent-room/notes/
-docs/plans/
 temp/
 ```
 
@@ -221,7 +215,7 @@ tests/
 4. 确认 `.env.example` 能被 git 看到。
 5. 确认 `.awz/references.json` 能被 git 看到，且已有项目中的同名文件不会被 force 覆盖。
 6. 确认 `docs/agent-room/status.md` 已生成。
-7. 确认 `docs/README.md`、`temp/README.md`、agent onboarding、分层 guides、review/release/handoff/decision 模板已生成到 ignored 本地工作区。
+7. 确认 `docs/README.md`、`docs/references/README.md`、`temp/README.md`、agent onboarding、分层 guides、review/release/handoff/decision 模板已生成到 ignored 本地工作区。
 8. 运行最小可用 smoke command。
 9. 总结已经生成什么，以及哪些东西是故意没生成。
 
