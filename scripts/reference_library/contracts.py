@@ -46,6 +46,7 @@ def build_plan(
     operation: str,
     changes: List[Dict[str, Any]],
     snapshots: List[Dict[str, Any]],
+    validated_inputs: Optional[Dict[str, Any]] = None,
     warnings: Optional[List[str]] = None,
     blocked_by: Optional[List[str]] = None,
     recovery: Optional[List[str]] = None,
@@ -53,6 +54,7 @@ def build_plan(
     plan = {
         "schemaVersion": PLAN_SCHEMA_VERSION,
         "operation": operation,
+        "validatedInputs": validated_inputs or {},
         "changes": changes,
         "warnings": warnings or [],
         "blockedBy": blocked_by or [],

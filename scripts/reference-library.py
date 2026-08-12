@@ -9,6 +9,7 @@ parsing this program's human-readable output.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -27,6 +28,7 @@ from reference_library.catalog import (
     split_values,
     status_rows,
     validate_category,
+    validate_license_url,
     validate_public_url,
     validate_reference_id,
 )
@@ -65,9 +67,17 @@ def emit_json_result(
 
 
 def write_plan(
-    operation: str, changes: List[Dict[str, Any]], snapshot_targets: List[Path]
+    operation: str,
+    changes: List[Dict[str, Any]],
+    snapshot_targets: List[Path],
+    validated_inputs: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    return build_plan(operation, changes, snapshot_paths(snapshot_targets))
+    return build_plan(
+        operation,
+        changes,
+        snapshot_paths(snapshot_targets),
+        validated_inputs=validated_inputs,
+    )
 
 
 def validate_apply_plan(args: argparse.Namespace, plan: Dict[str, Any]) -> None:
@@ -102,6 +112,7 @@ def command_configure(args: argparse.Namespace) -> int:
             {"kind": "ensure-layout", "target": str(root), "summary": "创建或验证 Reference Library 目录结构"},
         ],
         [path, root],
+        {"root": str(root), "depth": args.depth},
     )
     if args.dry_run:
         if emit_json_result(args, "reference.configure", 0, dry_run=True, plan=plan, data={"config": data}):
@@ -137,6 +148,8 @@ def command_add(args: argparse.Namespace) -> int:
     clone_source = source
     local_safe_directory: Optional[str] = None
     local_bundle = False
+    local_source: Optional[Path] = None
+    source_revision: Optional[str] = None
     if args.allow_local:
         local_source = resolved_path(source)
         if not local_source.exists():
@@ -146,8 +159,31 @@ def command_add(args: argparse.Namespace) -> int:
         stored_url = validate_public_url(args.canonical_url) if args.canonical_url else clone_source
         if local_source.is_dir():
             local_safe_directory = (local_source / ".git").as_posix()
+            source_top_level = run_git(["rev-parse", "--show-toplevel"], cwd=local_source).stdout.strip()
+            if Path(source_top_level).resolve(strict=False) != local_source.resolve(strict=False):
+                raise ReferenceLibraryError(f"Local source is not a standalone Git repository: {local_source}")
+            source_revision = run_git(["rev-parse", "HEAD"], cwd=local_source).stdout.strip()
     else:
         stored_url = validate_public_url(source)
+    license_url = validate_license_url(args.license_url) if args.license_url else None
+
+    validated_inputs: Dict[str, Any] = {
+        "id": reference_id,
+        "name": args.name or reference_id,
+        "repositoryUrl": sanitize_url(stored_url),
+        "category": category,
+        "depth": args.depth,
+        "tags": split_values(args.tag),
+        "readFirst": split_values(args.read_first),
+        "useWhen": split_values(args.use_when),
+        "avoidWhen": split_values(args.avoid_when),
+        "licenseUrl": license_url,
+        "allowLocal": bool(args.allow_local),
+        "sourceRevision": source_revision,
+    }
+    snapshot_targets = [destination, metadata_path]
+    if local_source is not None:
+        snapshot_targets.append(local_source)
 
     plan = write_plan(
         "reference.add",
@@ -155,7 +191,8 @@ def command_add(args: argparse.Namespace) -> int:
             {"kind": "git-clone", "target": str(destination), "summary": "clone 公开参考仓库，不执行其代码或 submodule"},
             {"kind": "write-json", "target": str(metadata_path), "summary": "写入 reference catalog"},
         ],
-        [destination, metadata_path],
+        snapshot_targets,
+        validated_inputs,
     )
     if args.dry_run:
         if emit_json_result(
@@ -203,13 +240,13 @@ def command_add(args: argparse.Namespace) -> int:
             "revision": head,
             "version": detect_version(destination),
             "branch": branch_process.stdout.strip() or "detached",
-            "tags": split_values(args.tag),
+            "tags": validated_inputs["tags"],
             "trust": "source-only",
             "readFirst": read_first,
-            "useWhen": split_values(args.use_when),
-            "avoidWhen": split_values(args.avoid_when),
+            "useWhen": validated_inputs["useWhen"],
+            "avoidWhen": validated_inputs["avoidWhen"],
             "license": detect_license(destination),
-            "licenseUrl": args.license_url or None,
+            "licenseUrl": license_url,
             "notes": "",
             "source": {"kind": "public-git"},
             "createdAt": timestamp,
@@ -292,6 +329,12 @@ def command_map(args: argparse.Namespace) -> int:
         "reference.map",
         [{"kind": "write-json", "target": str(path), "summary": f"在项目中映射参考 {reference_id}"}],
         [path],
+        {
+            "project": str(project),
+            "id": reference_id,
+            "purpose": args.purpose or "",
+            "required": bool(args.required),
+        },
     )
     if args.dry_run:
         if emit_json_result(args, "reference.map", 0, dry_run=True, plan=plan, data={"mapping": mapping}):
@@ -321,6 +364,7 @@ def command_unmap(args: argparse.Namespace) -> int:
         "reference.unmap",
         [{"kind": "write-json", "target": str(path), "summary": f"从项目取消映射参考 {reference_id}"}],
         [path],
+        {"project": str(project), "id": reference_id},
     )
     if args.dry_run:
         if emit_json_result(args, "reference.unmap", 0, dry_run=True, plan=plan, data={"mapping": mapping}):
@@ -341,13 +385,18 @@ def command_context(args: argparse.Namespace) -> int:
     config, _, _ = load_config()
     root = library_root(config)
     catalogs = load_catalogs(root)
-    content, required_missing = context_markdown(project, root, mapping, catalogs)
+    content, required_unusable = context_markdown(project, root, mapping, catalogs)
     output = resolve_context_output(project, args.output)
-    exit_code = 1 if required_missing else 0
+    exit_code = 1 if required_unusable else 0
     plan = write_plan(
         "reference.context",
         [{"kind": "write-text", "target": str(output), "summary": "生成项目本地 Agent reference context"}],
         [output],
+        {
+            "project": str(project),
+            "output": str(output),
+            "contentSha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+        },
     )
     if args.dry_run:
         if emit_json_result(args, "reference.context", exit_code, dry_run=True, plan=plan, data={"output": str(output), "content": content}):

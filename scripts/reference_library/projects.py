@@ -52,7 +52,7 @@ def context_markdown(
         f"- Reference root: `{root}`",
         "",
     ]
-    required_missing = False
+    required_unusable = False
     references = mapping.get("references", [])
     if not references:
         lines.extend(["当前项目没有映射参考项目。", ""])
@@ -69,9 +69,11 @@ def context_markdown(
         lines.extend([f"## {heading}", "", f"- Purpose: {purpose or '未填写'}", f"- Required: {str(required).lower()}"])
         if catalog is None:
             lines.extend(["- Status: unresolved", "- Catalog: missing", ""])
-            required_missing = required_missing or required
+            required_unusable = required_unusable or required
             continue
         state = repository_state(root, catalog)
+        if required and state["status"] in ("missing", "invalid", "error"):
+            required_unusable = True
         lines.extend(
             [
                 f"- Status: {state['status']}",
@@ -93,7 +95,7 @@ def context_markdown(
         if state.get("issues"):
             lines.extend(["- Issues:", *[f"  - {item}" for item in state["issues"]]])
         lines.append("")
-    return "\n".join(lines).rstrip() + "\n", required_missing
+    return "\n".join(lines).rstrip() + "\n", required_unusable
 
 
 def resolve_context_output(project: Path, output_value: Optional[str]) -> Path:

@@ -62,6 +62,13 @@ configure_plan=$(bash "$reference_cli" configure --root "$library_root" --dry-ru
 printf '%s\n' "$configure_plan" | grep -Fq '"operation": "reference.configure"' || die 'configure JSON operation is invalid'
 configure_plan_hash=$(printf '%s\n' "$configure_plan" | sed -n 's/^[[:space:]]*"planHash": "\([^"]*\)".*/\1/p')
 [[ -n "$configure_plan_hash" ]] || die 'configure JSON plan hash is missing'
+printf '%s\n' "$configure_plan" | grep -Fq '"depth": 1' || die 'configure plan omitted validated depth'
+changed_configure_plan=$(bash "$reference_cli" configure --root "$library_root" --depth 2 --dry-run --json)
+changed_configure_plan_hash=$(printf '%s\n' "$changed_configure_plan" | sed -n 's/^[[:space:]]*"planHash": "\([^"]*\)".*/\1/p')
+[[ "$changed_configure_plan_hash" != "$configure_plan_hash" ]] || die 'configure plan hash ignored changed inputs'
+if bash "$reference_cli" configure --root "$library_root" --depth 2 --json --plan-hash "$configure_plan_hash" >/dev/null 2>&1; then
+    die 'configure accepted a plan hash generated for different inputs'
+fi
 bash "$reference_cli" configure --root "$library_root" --json --plan-hash "$configure_plan_hash" >/dev/null
 grep -Fq '"schemaVersion": 2' "$config_dir/config.json" || die 'configure did not write schema v2'
 if bash "$reference_cli" configure --root "$library_root" --json >/dev/null 2>&1; then
@@ -83,6 +90,12 @@ if bash "$reference_cli" add --id credential-url --url 'https://user:secret@exam
     die 'credential-bearing URL was accepted'
 fi
 ! grep -Fq secret "$smoke_root/credential.log" || die 'credential-bearing URL leaked in output'
+if bash "$reference_cli" add --id credential-license --url "$fixture_repo" \
+    --canonical-url https://example.com/credential-license.git --allow-local \
+    --license-url 'https://user:license-secret@example.com/license' --dry-run > "$smoke_root/license-credential.log" 2>&1; then
+    die 'credential-bearing license URL was accepted'
+fi
+! grep -Fq license-secret "$smoke_root/license-credential.log" || die 'credential-bearing license URL leaked in output'
 if bash "$reference_cli" add --id escape --url "$fixture_repo" --category ../escape --allow-local --dry-run >/dev/null 2>&1; then
     die 'category traversal was accepted'
 fi
@@ -95,13 +108,42 @@ bash "$reference_cli" add --id fixture --name 'Fixture Reference' --url "$fixtur
 bash "$reference_cli" list | grep -Fq fixture || die 'list did not show fixture'
 bash "$reference_cli" show --id fixture | grep -Fq '"version": "1.2.3"' || die 'show did not detect version'
 
+broken_repo="$library_root/repos/broken"
+mkdir -p "$broken_repo/.git"
+printf '%s\n' '{"schemaVersion":2,"id":"broken","relativePath":"repos/broken","repositoryUrl":"https://example.com/broken.git","revision":"missing"}' > "$library_root/catalog/broken.json"
+broken_status=$(bash "$reference_cli" status --json)
+printf '%s\n' "$broken_status" | grep -A8 '"id": "broken"' | grep -Fq '"status": "invalid"' || die 'status treated a broken nested .git directory as the parent repository'
+rm -rf "$broken_repo"
+rm -f "$library_root/catalog/broken.json"
+
+printf '%s\n' '{"schemaVersion":2,"id":"unsafe-catalog","relativePath":"repos/unsafe-catalog","repositoryUrl":"https://example.com/unsafe.git?token=catalog-secret","revision":"missing"}' > "$library_root/catalog/unsafe-catalog.json"
+if bash "$reference_cli" show --id unsafe-catalog > "$smoke_root/unsafe-catalog.log" 2>&1; then
+    die 'unsafe catalog URL was accepted'
+fi
+! grep -Fq catalog-secret "$smoke_root/unsafe-catalog.log" || die 'unsafe catalog URL leaked in output'
+rm -f "$library_root/catalog/unsafe-catalog.json"
+
 bash "$initializer" --target "$project_path" --name 'Reference Smoke Project' >/dev/null
 mapping_path="$project_path/.awz/references.json"
 [[ -f "$mapping_path" ]] || die 'initializer did not create project mapping'
 
 bash "$reference_cli" map --project "$project_path" --id fixture --purpose smoke --dry-run >/dev/null
 ! grep -Fq fixture "$mapping_path" || die 'map dry-run changed mapping'
+map_plan=$(bash "$reference_cli" map --project "$project_path" --id fixture --purpose smoke --dry-run --json)
+changed_map_plan=$(bash "$reference_cli" map --project "$project_path" --id fixture --purpose changed --dry-run --json)
+map_plan_hash=$(printf '%s\n' "$map_plan" | sed -n 's/^[[:space:]]*"planHash": "\([^"]*\)".*/\1/p')
+changed_map_plan_hash=$(printf '%s\n' "$changed_map_plan" | sed -n 's/^[[:space:]]*"planHash": "\([^"]*\)".*/\1/p')
+[[ "$map_plan_hash" != "$changed_map_plan_hash" ]] || die 'map plan hash ignored changed purpose'
 bash "$reference_cli" map --project "$project_path" --id fixture --purpose smoke >/dev/null
+
+printf '%s\n' '{"schemaVersion":2,"id":"required-missing","relativePath":"repos/missing/required-missing","repositoryUrl":"https://example.com/required-missing.git","revision":"missing"}' > "$library_root/catalog/required-missing.json"
+bash "$reference_cli" map --project "$project_path" --id required-missing --required >/dev/null
+if bash "$reference_cli" context --project "$project_path" --dry-run > "$smoke_root/required-context.log"; then
+    die 'context accepted an unusable required reference'
+fi
+grep -Fq 'Status: missing' "$smoke_root/required-context.log" || die 'context did not report an unusable required reference'
+bash "$reference_cli" unmap --project "$project_path" --id required-missing >/dev/null
+rm -f "$library_root/catalog/required-missing.json"
 
 bash "$reference_cli" context --project "$project_path" --dry-run >/dev/null
 context_path="$project_path/docs/agent-room/reference-context.md"

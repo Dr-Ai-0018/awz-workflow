@@ -47,16 +47,26 @@ def sanitize_url(value: str) -> str:
     netloc = hostname
     if parsed.port:
         netloc = f"{netloc}:{parsed.port}"
-    return urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
+    return urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))
+
+
+def validate_safe_url(value: str, label: str, *, require_path: bool = False) -> str:
+    parsed = urlsplit(value)
+    if parsed.scheme.lower() != "https" or not parsed.hostname:
+        raise ReferenceLibraryError(f"{label} must be a valid https:// URL.")
+    if require_path and not parsed.path.strip("/"):
+        raise ReferenceLibraryError(f"{label} must include a repository path.")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ReferenceLibraryError(f"{label} cannot contain credentials, query parameters, or fragments.")
+    return sanitize_url(value)
 
 
 def validate_public_url(value: str) -> str:
-    parsed = urlsplit(value)
-    if parsed.scheme.lower() != "https" or not parsed.hostname or not parsed.path.strip("/"):
-        raise ReferenceLibraryError("First-version public references require a valid https:// Git URL.")
-    if parsed.username or parsed.password:
-        raise ReferenceLibraryError("Credential-bearing repository URLs are not allowed.")
-    return sanitize_url(value)
+    return validate_safe_url(value, "Public repository URL", require_path=True)
+
+
+def validate_license_url(value: str) -> str:
+    return validate_safe_url(value, "License URL")
 
 
 def catalog_path(root: Path, reference_id: str) -> Path:
@@ -79,6 +89,23 @@ def normalize_catalog(data: Dict[str, Any], path: Path) -> Dict[str, Any]:
         raise ReferenceLibraryError(f"Unsupported catalog schemaVersion: {path}")
     normalized = {**data}
     normalized["schemaVersion"] = SCHEMA_VERSION
+    repository_url = normalized.get("repositoryUrl")
+    if isinstance(repository_url, str) and repository_url:
+        parsed_repository = urlsplit(repository_url)
+        if parsed_repository.scheme == "https":
+            normalized["repositoryUrl"] = validate_public_url(repository_url)
+        elif parsed_repository.scheme == "file" and not (
+            parsed_repository.username
+            or parsed_repository.password
+            or parsed_repository.query
+            or parsed_repository.fragment
+        ):
+            normalized["repositoryUrl"] = sanitize_url(repository_url)
+        else:
+            raise ReferenceLibraryError(f"Unsafe repository URL in catalog: {path}")
+    license_url = normalized.get("licenseUrl")
+    if isinstance(license_url, str) and license_url:
+        normalized["licenseUrl"] = validate_license_url(license_url)
     normalized.setdefault("notes", "")
     normalized.setdefault("source", {"kind": "public-git"})
     normalized.setdefault("createdAt", None)
@@ -165,12 +192,22 @@ def repository_state(root: Path, catalog: Dict[str, Any]) -> Dict[str, Any]:
         state["status"] = "invalid"
         return state
 
-    head = run_git(["rev-parse", "HEAD"], cwd=repo_path).stdout.strip()
-    branch_process = run_git(["symbolic-ref", "--short", "-q", "HEAD"], cwd=repo_path, check=False)
-    branch = branch_process.stdout.strip() or "detached"
-    remote_process = run_git(["remote", "get-url", "origin"], cwd=repo_path, check=False)
-    remote = sanitize_url(remote_process.stdout.strip()) if remote_process.returncode == 0 else ""
-    dirty = bool(run_git(["status", "--porcelain"], cwd=repo_path).stdout.strip())
+    try:
+        top_level = run_git(["rev-parse", "--show-toplevel"], cwd=repo_path).stdout.strip()
+        if Path(top_level).resolve(strict=False) != repo_path.resolve(strict=False):
+            issues.append("repository Git top-level does not match its catalog path")
+            state["status"] = "invalid"
+            return state
+        head = run_git(["rev-parse", "HEAD"], cwd=repo_path).stdout.strip()
+        branch_process = run_git(["symbolic-ref", "--short", "-q", "HEAD"], cwd=repo_path, check=False)
+        branch = branch_process.stdout.strip() or "detached"
+        remote_process = run_git(["remote", "get-url", "origin"], cwd=repo_path, check=False)
+        remote = sanitize_url(remote_process.stdout.strip()) if remote_process.returncode == 0 else ""
+        dirty = bool(run_git(["status", "--porcelain"], cwd=repo_path).stdout.strip())
+    except ReferenceLibraryError as exc:
+        issues.append(str(exc))
+        state["status"] = "invalid"
+        return state
     expected_revision = str(catalog.get("revision", ""))
     expected_remote = sanitize_url(str(catalog.get("repositoryUrl", "")))
 
