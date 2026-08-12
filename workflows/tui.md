@@ -26,6 +26,8 @@ Ubuntu/POSIX：
 bash scripts/awz.sh
 ```
 
+POSIX TUI 应在 Ubuntu、Linux 或 Windows Terminal 的 WSL profile 内运行。从 Windows PowerShell 跨宿主直接调用 `bash scripts/awz.sh` 时，`wsl.exe` 的输出转码可能让中文显示为乱码；Windows 会话应使用 `awz.bat` / `awz.ps1`，这不影响 POSIX 脚本在 UTF-8 终端中的行为。
+
 `awz.bat` 只选择 `pwsh` 或 Windows PowerShell，并把参数转交给 `awz.ps1`。`awz.ps1` 与 `awz.sh` 负责交互；真实初始化仍分别由 `init-project.ps1` 与 `init-project.sh` 完成。
 
 Windows 的阶段面板、中文宽度计算、编号选择与预览呈现集中在 `scripts/lib/AwzTui.psm1`；`awz.ps1` 只保留流程编排与底层初始化器调用，避免继续膨胀成单文件应用。

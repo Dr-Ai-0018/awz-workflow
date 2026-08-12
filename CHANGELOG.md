@@ -13,6 +13,7 @@
 - Windows `init-project.bat` 快捷入口，复用 PowerShell 核心实现并为后续交互入口保留稳定参数层。
 - Windows `awz.bat` / `awz.ps1` 与 POSIX `awz.sh` 终端交互入口。
 - TUI 的强制 DryRun、确认执行、脚本化参数和跨平台 smoke 覆盖。
+- Reference Library 的项目映射、离线状态检查、结构化 plan/result 和跨平台管理入口。
 
 ### Fixed
 
@@ -21,6 +22,8 @@
 - 默认新项目初始化拒绝非空目录，避免把 AWZ 文件混入同名旧项目。
 - `Force` 不能再绕过新项目安全检查，已有项目接入必须显式选择对应模式。
 - 已有项目模式即使使用 `Force` 也会保留项目自有的 `.gitignore`、`.env.example`、`README.md` 和 `LICENSE`。
+- Reference Library 的计划 hash 绑定 validated inputs，损坏 Git 目录不再误判为健康仓库，所有可展示 URL 均拒绝凭据。
+- Release 打包会排除 Python `__pycache__`、`.pyc` 与 `.pyo` 本机缓存。
 
 ### Changed
 

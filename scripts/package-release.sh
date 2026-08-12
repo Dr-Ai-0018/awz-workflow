@@ -74,5 +74,8 @@ for path in VERSION CHANGELOG.md LICENSE README.md requirements style workflows 
     cp -R "$root/$path" "$stage_root/$path"
 done
 
+find "$stage_root" -type d -name __pycache__ -prune -exec rm -rf -- {} +
+find "$stage_root" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+
 tar -C "$stage_parent" -czf "$package_path" "$release_dir"
 printf 'Created release package: %s\n' "$package_path"

@@ -95,6 +95,12 @@ try {
         Copy-Item -LiteralPath $source -Destination (Join-Path $stageRoot $relativePath) -Recurse -Force
     }
 
+    Get-ChildItem -LiteralPath $stageRoot -Recurse -Directory -Filter "__pycache__" |
+        Sort-Object FullName -Descending |
+        Remove-Item -Recurse -Force
+    Get-ChildItem -LiteralPath $stageRoot -Recurse -File -Include "*.pyc", "*.pyo" |
+        Remove-Item -Force
+
     & tar -C $stageParent -czf $packagePath $releaseDirectoryName
     if ($LASTEXITCODE -ne 0) {
         throw "tar failed with exit code $LASTEXITCODE"

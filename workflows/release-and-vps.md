@@ -8,14 +8,14 @@
 
 `v0.1` 历史版本只有 Windows 初始化入口。`v0.2.0` 已完成 Windows PowerShell 与真实 Ubuntu VPS 的初始化、打包和解压隔离 smoke，可作为第一个正式跨平台 release。
 
-当前正式版本具备：
+当前仓库在 `v0.2.0` 正式发布基线上继续具备：
 
 - Windows 终端交互入口是 `scripts/awz.bat` / `scripts/awz.ps1`；
 - Ubuntu/POSIX 终端交互入口是 `scripts/awz.sh`；
 - Windows 初始化入口是 `scripts/init-project.ps1`；
 - Windows `cmd` 快捷入口是 `scripts/init-project.bat`，只转发到 PowerShell 实现；
 - Ubuntu/POSIX 初始化入口是 `scripts/init-project.sh`；
-- 可选 Reference Library 入口是 `scripts/reference-library.ps1` / `scripts/reference-library.sh`，共享 Python 标准库核心；
+- Unreleased 的可选 Reference Library 入口是 `scripts/reference-library.ps1` / `scripts/reference-library.sh`，共享 Python 标准库核心；
 - 两端都支持 dry-run、强制覆盖、UTF-8 模板渲染和 `git init -b main`；
 - Windows 与 POSIX 的 release 打包入口分别是 `package-release.ps1`、`package-release.sh`；
 - Windows PowerShell 与真实 Ubuntu VPS 的 dry-run、真实初始化和解压隔离 smoke 均已验证。
@@ -117,7 +117,7 @@ awz-workflow-v0.2.0/
 2. Windows `-DryRun` 和真实 smoke 都通过。
 3. Linux `--dry-run` 和真实 smoke 都通过。
 4. 解压后的临时目录中运行两端 smoke，不从源仓库借模板。
-5. 包内不含密钥、`.env`、本地 Agent 状态、`docs/`、`temp/` 或 `.git/`。
+5. 包内不含密钥、`.env`、本地 Agent 状态、`docs/`、`temp/`、`.git/`、`__pycache__/`、`.pyc` 或 `.pyo`。
 6. 记录版本、commit SHA、打包时间和验证命令。
 7. 包内不含 reference repos、机器级 reference 配置、context cache 或 reference logs。
 
