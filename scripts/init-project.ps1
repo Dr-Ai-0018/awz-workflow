@@ -224,7 +224,7 @@ $localFiles = @(
     @{ Source = "references-layout.md"; Dest = "docs/references/README.md"; Render = $false; ProtectInExisting = $true },
     @{ Source = "agent-onboarding.md"; Dest = "docs/agent-room/onboarding.md"; Render = $false },
     @{ Source = "room-ledger.py"; Dest = "docs/agent-room/room-ledger.py"; Render = $false },
-    @{ Source = "guides/collaboration.md"; Dest = "docs/agent-room/guides/collaboration.md"; Render = $false },
+    @{ Source = "guides/collaboration.md"; Dest = "docs/agent-room/guides/collaboration.md"; Render = $false; ProtectInExisting = $true },
     @{ Source = "guides/repository-hygiene.md"; Dest = "docs/agent-room/guides/repository-hygiene.md"; Render = $false },
     @{ Source = "guides/git-workflow.md"; Dest = "docs/agent-room/guides/git-workflow.md"; Render = $false },
     @{ Source = "guides/verification.md"; Dest = "docs/agent-room/guides/verification.md"; Render = $false },

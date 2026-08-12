@@ -242,7 +242,7 @@ local_files=(
     'references-layout.md|docs/references/README.md|false|true'
     'agent-onboarding.md|docs/agent-room/onboarding.md|false'
     'room-ledger.py|docs/agent-room/room-ledger.py|false'
-    'guides/collaboration.md|docs/agent-room/guides/collaboration.md|false'
+    'guides/collaboration.md|docs/agent-room/guides/collaboration.md|false|true'
     'guides/repository-hygiene.md|docs/agent-room/guides/repository-hygiene.md|false'
     'guides/git-workflow.md|docs/agent-room/guides/git-workflow.md|false'
     'guides/verification.md|docs/agent-room/guides/verification.md|false'

@@ -1,54 +1,56 @@
-# Agent 协作指南
+# Agent 协作配置
 
-## 默认分工
+本文件由项目维护，用来选择当前协作策略。不要按模型品牌预设职责；先看实际参与的 Agent、model、harness、工具权限和已验证能力，再分配 owner。参与者变化时可以切换策略，但必须同步 `status.md`。
 
-Codex 默认负责：
+## 当前配置
 
-- 复杂逻辑；
-- 后端和 API；
-- 高风险改动；
-- root-cause debug；
-- 容错率低的兜底场景。
+- Agent 数量：`[待填写]`
+- 当前策略：`[single / pair / triad / team]`
+- 选择依据：`[任务风险、能力互补、可用工具、并发需求]`
+- 切换条件：`[何时增减 Agent 或调整角色]`
 
-Claude Code 默认负责：
+以下模式只激活一项，并填写该项中的 `[]`。
 
-- 工具调用和流程串联；
-- 浏览器预览和 UI 反馈；
-- 前端设计与开发；
-- 大方向把控和第二视角。
+## [ ] 单 Agent
 
-小任务可以单 Agent 完成。大项目可以双 Agent 协作，但每个切片必须有清楚 owner。
+- Agent / model / harness：`[]`
+- 任务范围：`[全流程负责]`
 
-## 交流区
+单 Agent 默认完成理解、设计、实现、验证和交接，不因只有一个 Agent 就降低验收标准。如果环境支持调节思考深度，可按任务切换：检索、格式化和明确小改用浅；普通实现与 review 用中；架构、高风险变更、复杂 root-cause 和不可逆决策用深。以足够解决问题为准，不机械拉满。
 
-`docs/agent-room/` 是本地 Agent 交流区，默认不进 git。
+## [ ] 双 Agent
 
-- `status.md`：当前阶段、owner、阻塞项、下一步；
-- `room.ndjson`：受锁保护的 append-only 时间线，必须通过 `room-ledger.py` 写入；
-- `handoffs/`：跨 Agent 交接；
-- `reviews/`：P0/P1/P2/P3 checklist；
-- `decisions/`：本地 ADR 草稿和方案对比；
-- `notes/`：调研摘记和待确认想法。
+- Agent A：`[]`；优势与 owner：`[]`
+- Agent B：`[]`；优势与 owner：`[]`
+- 协作形态：`[实现 + review / backend + frontend / 调研 + 落地 / 其他]`
 
-Agent 可以在交流区留下判断、疑问和风险提示，但要服务项目进展，不写无意义表演文本。
+按能力互补和任务边界分工，不按模型名称分工。示例：当组合确实是 Codex + Claude Code 时，可以让 Codex 偏复杂逻辑、backend/API、高风险 debug 与正确性验证；Claude Code 偏工具串联、浏览器/UI、frontend 和第二视角。能力证据与当前工具状态优先于这个示例。
 
-## Owner 表
+## [ ] 三 Agent
 
-多 Agent 协作时，在 `docs/agent-room/status.md` 维护 owner 表：
+- Agent A：`[]`；角色：`[]`
+- Agent B：`[]`；角色：`[]`
+- Agent C：`[]`；角色：`[]`
+- 协作形态：`[主导 + 实现 + 独立 review / backend + frontend + integration / 调研 + 实现 + 验证 / 其他]`
 
-```text
-| 范围 | Owner | 状态 | 备注 |
-| --- | --- | --- | --- |
-| backend/api | Codex | editing | contract 变更需通知 Claude |
-```
+三者必须形成互补闭环，不能只是把同一任务复制三遍。明确谁收敛方案、谁拥有实现范围、谁做独立验证。
 
-状态建议：
+## [ ] 四个及以上 Agent
 
-- `editing`：正在改，其他 Agent 不要碰同范围；
-- `waiting`：等待输入或依赖；
-- `reviewing`：只读 review，不直接改 owner 范围；
-- `done`：阶段完成，可以交接或合并。
+- Lead / coordinator：`[]`
+- Domain owners：`[]`
+- Independent verifier：`[]`
+- 并发上限与合并门槛：`[]`
 
-重要结论要沉淀到代码、README、公开文档、ADR、issue/PR 或正式记录，不要只留在 ignored `docs/`。
+采用主次分明的团队拓扑：一名 lead 维护目标、contract 和合并顺序；其余按模块或职责拥有切片；至少一名 verifier 不参与被审改动。不要让所有 Agent 通读全部材料或同时编辑同一范围。
 
-时间线记录不得使用重复的 `---`、署名或标题作为追加锚点。旧记录需要修正时，追加 `amend` 并引用原记录 ID，不能原地改写别人的记录。具体命令和校验规则见 `room-ledger.md`。
+## 动态切换
+
+Agent 加入、退出、能力受限或任务阶段变化时：
+
+1. 更新本文件的 Agent 数量和激活模式；
+2. 在 `status.md` 更新 owner、状态、依赖和等待事项；
+3. 释放旧 owner，必要时写 handoff；
+4. 已完成验证不重复做，未覆盖风险明确转交。
+
+`room.ndjson` 只能通过 `room-ledger.py` 追加；重要结论要提升到代码、README、正式文档、ADR、issue 或 PR。

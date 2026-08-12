@@ -5,7 +5,7 @@ AWZ Workflow 是程林自己的个人开发工作流基线，用来把长期和 
 它不是“大厂制度大全”，也不是为了显得专业而堆流程。它的目标很朴素：
 
 - 新项目启动时，不再每次重新训 AI；
-- Codex 和 Claude Code 可以按清楚的分工协作；
+- 不同 model 与 harness 可以按数量、能力和任务风险动态协作；
 - 多个 Agent 有本地交流区，可以对齐状态、handoff、review 和决策；
 - 仓库默认干净，不把密钥、本地文档、临时产物塞进 git；
 - 代码默认现代、可测、可拆、能维护；
@@ -33,7 +33,7 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 - 本地 ignored `AGENTS.md` / `CLAUDE.md` 指令文件；
 - `docs/agent-room/` 交流区、handoff 和 review checklist；
 - append-only room ledger、并发追加和历史篡改检测；
-- Codex + Claude Code 双核协作方式；
+- 单 Agent、双 Agent、三 Agent 与多 Agent 团队的自适应协作方式；
 - git 分支、阶段、版本和 commit 节奏；
 - 代码架构和文件复杂度基线；
 - 前端 UI 质量底线；
@@ -50,7 +50,7 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 ├─ requirements/
 │  └─ awz-workflow-v0.1.md
 ├─ workflows/
-│  ├─ dual-agent-development.md
+│  ├─ agent-collaboration.md
 │  ├─ room-ledger.md
 │  ├─ agent-onboarding.md
 │  ├─ project-initialization.md

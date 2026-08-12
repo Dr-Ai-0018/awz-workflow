@@ -14,6 +14,12 @@
 - 状态：初始化完成，等待任务定义
 - Dirty state：待检查
 
+## 协作策略
+
+- 配置文件：`docs/agent-room/guides/collaboration.md`
+- 当前模式：待选择
+- 活跃 Agent：待填写
+
 ## Owner 表
 
 | 范围 | Owner | 状态 | 备注 |
@@ -29,7 +35,7 @@
 
 - [ ] 明确目标和边界
 - [ ] 确认技术栈和验证方式
-- [ ] 拆分 Agent owner
+- [ ] 按实际 Agent 能力选择协作模式并拆分 owner
 
 ## 阻塞项
 

@@ -44,6 +44,9 @@ for path in AGENTS.md CLAUDE.md docs docs/references/README.md docs/agent-room/r
 done
 
 grep -Fq 'docs/references/README.md' "$smoke_path/AGENTS.md" || die 'AGENTS.md does not expose the reference index entry'
+for mode_label in '单 Agent' '双 Agent' '三 Agent' '四个及以上 Agent'; do
+    grep -Fq "$mode_label" "$smoke_path/docs/agent-room/guides/collaboration.md" || die "collaboration strategy is missing mode: $mode_label"
+done
 
 if git -C "$smoke_path" check-ignore -q -- .env.example; then
     die '.env.example must remain trackable'
@@ -66,6 +69,7 @@ printf '%s\n' 'custom local AGENTS' > "$smoke_path/AGENTS.md"
 printf '%s\n' '{"schemaVersion":1,"references":[{"id":"custom"}]}' > "$smoke_path/.awz/references.json"
 printf '%s\n' 'custom project context' > "$smoke_path/docs/references/README.md"
 printf '%s\n' 'custom project status' > "$smoke_path/docs/agent-room/status.md"
+printf '%s\n' 'custom collaboration strategy' > "$smoke_path/docs/agent-room/guides/collaboration.md"
 bash "$initializer" --target "$smoke_path" --mode existing --force
 [[ "$(<"$smoke_path/README.md")" == 'custom local README' ]] || die '--force overwrote a protected project README'
 if grep -Fq 'custom local AGENTS' "$smoke_path/AGENTS.md"; then
@@ -74,6 +78,7 @@ fi
 grep -Fq '"id":"custom"' "$smoke_path/.awz/references.json" || die '--force overwrote project-owned .awz/references.json'
 grep -Fq 'custom project context' "$smoke_path/docs/references/README.md" || die '--force overwrote project-owned docs/references/README.md'
 grep -Fq 'custom project status' "$smoke_path/docs/agent-room/status.md" || die '--force overwrote project-owned status.md'
+grep -Fq 'custom collaboration strategy' "$smoke_path/docs/agent-room/guides/collaboration.md" || die '--force overwrote project-owned collaboration strategy'
 
 mkdir -p "$occupied_path"
 printf '%s\n' 'preserve me' > "$occupied_path/valuable.txt"

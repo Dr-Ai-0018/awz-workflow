@@ -15,6 +15,7 @@
 - TUI 的强制 DryRun、确认执行、脚本化参数和跨平台 smoke 覆盖。
 - Reference Library 的项目映射、离线状态检查、结构化 plan/result 和跨平台管理入口。
 - 初始化项目新增统一的 `docs/references/` 背景与资料入口，Reference Library context 同目录生成。
+- Agent 协作规则支持单 Agent、双 Agent、三 Agent 与四个以上团队按实际 model/harness 能力动态选择策略。
 
 ### Fixed
 
@@ -25,7 +26,7 @@
 - 已有项目模式即使使用 `Force` 也会保留项目自有的 `.gitignore`、`.env.example`、`README.md` 和 `LICENSE`。
 - Reference Library 的计划 hash 绑定 validated inputs，损坏 Git 目录不再误判为健康仓库，所有可展示 URL 均拒绝凭据。
 - Release 打包会排除 Python `__pycache__`、`.pyc` 与 `.pyo` 本机缓存。
-- `Existing -Force` 不再覆盖项目持续维护的 `docs/references/README.md` 与 `docs/agent-room/status.md`。
+- `Existing -Force` 不再覆盖项目持续维护的 references、status 与协作策略配置。
 
 ### Changed
 

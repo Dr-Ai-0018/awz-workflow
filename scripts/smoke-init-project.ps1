@@ -62,6 +62,11 @@ try {
 
     $agentsContent = Get-Content -LiteralPath (Join-Path $smokePath "AGENTS.md") -Raw -Encoding UTF8
     Assert-True ($agentsContent.Contains("docs/references/README.md")) "AGENTS.md does not expose the reference index entry"
+    $generatedCollaborationPath = Join-Path $smokePath "docs/agent-room/guides/collaboration.md"
+    $generatedCollaboration = Get-Content -LiteralPath $generatedCollaborationPath -Raw -Encoding UTF8
+    foreach ($modeLabel in @("单 Agent", "双 Agent", "三 Agent", "四个及以上 Agent")) {
+        Assert-True ($generatedCollaboration.Contains($modeLabel)) "collaboration strategy is missing mode: $modeLabel"
+    }
 
     git -C $smokePath check-ignore -q -- ".env.example"
     Assert-True ($LASTEXITCODE -ne 0) ".env.example must remain trackable"
@@ -88,16 +93,19 @@ try {
     $agentsPath = Join-Path $smokePath "AGENTS.md"
     $projectContextPath = Join-Path $smokePath "docs/references/README.md"
     $projectStatusPath = Join-Path $smokePath "docs/agent-room/status.md"
+    $collaborationPath = $generatedCollaborationPath
     Set-Content -LiteralPath $referenceMapPath -Value '{"schemaVersion":1,"references":[{"id":"custom"}]}' -Encoding UTF8
     Set-Content -LiteralPath $agentsPath -Value "custom local AGENTS" -Encoding UTF8
     Set-Content -LiteralPath $projectContextPath -Value "custom project context" -Encoding UTF8
     Set-Content -LiteralPath $projectStatusPath -Value "custom project status" -Encoding UTF8
+    Set-Content -LiteralPath $collaborationPath -Value "custom collaboration strategy" -Encoding UTF8
     & $initializer -TargetPath $smokePath -Mode Existing -Force
     Assert-True ((Get-Content -LiteralPath $readmePath -Raw -Encoding UTF8).Trim() -eq "custom local README") "-Force overwrote a protected project README"
     Assert-True (-not ((Get-Content -LiteralPath $agentsPath -Raw -Encoding UTF8).Contains("custom local AGENTS"))) "-Force did not refresh AWZ-managed AGENTS.md"
     Assert-True ((Get-Content -LiteralPath $referenceMapPath -Raw -Encoding UTF8).Contains('"id":"custom"')) "-Force overwrote project-owned .awz/references.json"
     Assert-True ((Get-Content -LiteralPath $projectContextPath -Raw -Encoding UTF8).Contains("custom project context")) "-Force overwrote project-owned docs/references/README.md"
     Assert-True ((Get-Content -LiteralPath $projectStatusPath -Raw -Encoding UTF8).Contains("custom project status")) "-Force overwrote project-owned status.md"
+    Assert-True ((Get-Content -LiteralPath $collaborationPath -Raw -Encoding UTF8).Contains("custom collaboration strategy")) "-Force overwrote project-owned collaboration strategy"
 
     New-Item -ItemType Directory -Path $occupiedPath | Out-Null
     Set-Content -LiteralPath (Join-Path $occupiedPath "valuable.txt") -Value "preserve me" -Encoding UTF8

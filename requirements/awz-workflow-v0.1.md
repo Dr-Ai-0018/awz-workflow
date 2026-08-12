@@ -4,24 +4,14 @@
 
 ## 1. AI 协作模型
 
-程林日常主要使用 Codex 和 Claude Code 协作开发。
+程林会使用 Codex、Claude Code 以及其他 model/harness 协作开发。工作流不能把任何品牌写成必选角色，应先确认实际参与数量、工具权限、能力特点和任务风险，再选择策略。
 
-默认分工：
+- 单 Agent：全流程负责；支持 reasoning effort 时按任务风险使用浅、中、深等合适档位。
+- 双 Agent：按能力互补分工，例如实现 + review、backend + frontend、调研 + 落地。Codex + Claude Code 的既有分工只能作为其中一个示例。
+- 三 Agent：选择 lead + implementer + reviewer、backend + frontend + integration、research + build + verify 等闭环拓扑。
+- 四个及以上：必须有 lead、domain owners 和 independent verifier，主次分明并控制并发。
 
-- Codex：
-  - 复杂逻辑；
-  - 高难度实现；
-  - 容错率低的后端/API；
-  - debug 和兜底；
-  - 接口 contract 和正确性敏感改动。
-- Claude Code：
-  - 工具调用和流程串联；
-  - 浏览器预览和 UI 反馈；
-  - 大方向把控和第二视角；
-  - 前端设计与开发；
-  - 与 Codex 互补讨论。
-
-小任务可以单 Agent 解决。大项目应在确实能降低风险或提高质量时使用双核协作。
+项目在本地协作配置中激活一种策略并填写参与者；Agent 加入、退出或能力变化时允许动态切换，但必须同步 owner 和 handoff。
 
 Agent 不是单纯命令执行器。程林希望把 Agent 当作协作伙伴看待，允许它们在明确边界内交流、表达判断、提出疑问和记录思考。
 
@@ -198,10 +188,10 @@ commit 节奏：
 
 ## 7. 编辑和浏览器规则
 
-Codex 手工编辑：
+Agent 手工编辑：
 
-- 使用原生 `apply_patch`。
-- 如果 `apply_patch` 不可用，说明真实限制，不要静默改用不相关写入方式。
+- 优先使用当前 harness 提供的结构化 patch/edit 能力；Codex 使用原生 `apply_patch`。
+- 如果约定工具不可用，说明真实限制，不要静默改用会扩大写入范围的替代方式。
 
 浏览器预览：
 

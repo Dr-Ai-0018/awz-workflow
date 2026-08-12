@@ -17,7 +17,7 @@
 2. `-Force` / `--force` 不能绕过 `New` 模式，只能与显式 `Existing` 模式组合使用。
 3. `Existing` 模式默认保留已有文件，只补充缺失基线；force 只刷新 AWZ 管理的本地指导文件。
 4. 已有项目的 `.gitignore`、`.env.example`、`README.md`、`LICENSE` 永远视为项目自有文件，即使指定 force 也不能覆盖。
-5. `docs/references/README.md` 与 `docs/agent-room/status.md` 是项目持续维护的本地上下文，即使指定 force 也只能在缺失时创建，不能用空模板覆盖。
+5. `docs/references/README.md`、`docs/agent-room/status.md` 与 `docs/agent-room/guides/collaboration.md` 是项目持续维护的本地上下文，即使指定 force 也只能在缺失时创建，不能用空模板覆盖。
 6. `Existing` 模式不能指向不存在的目录，避免把参数写错后静默创建成新项目。
 7. 所有模板、目标类型、模式和 `git` 前置条件必须在首次写入前完成校验。
 8. 执行已有项目模式前必须先跑 DryRun，并 review 将写入、跳过或覆盖的清单。
