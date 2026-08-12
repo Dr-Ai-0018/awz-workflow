@@ -1,110 +1,41 @@
-# 前端基线
+# 前端任务入口
 
-AWZ 前端不能有通用 AI 味。
+默认只读本文件。先判断任务，再按需加载一份或多份专题；不要为了改一个按钮读取整套设计资料。
 
-目标是形成统一的 interface system：对齐、稳定、响应式、交互有手感。
+## 先判断产品与任务
 
-## 明确讨厌的模式
+产品界面的表达强度不同：
 
-避免：
+- 效率型、数据型产品：优先清晰、稳定、密度与操作反馈。
+- 内容型产品：优先阅读节奏、信息层级与导航连续性。
+- 品牌、营销页面：可以加强视觉表达和动效，但不能牺牲转化与可读性。
+- 叙事、实验体验：只有目标明确时才使用强转场、虚拟滚动、3D 或 WebGL。
 
-- card 套 card；
-- 随机 left-border 假装层级；
-- 到处都是大圆角矩形；
-- 间距不一致、列不对齐；
-- 原生控件裸奔；
-- 超长失控 div；
-- 尴尬的内部滚动条；
-- 文本溢出、裁切、挡住内容；
-- modal/toast 像事后补丁；
-- 没有系统性的假苹果味。
-
-## 构建顺序
-
-在堆很多页面之前，先定义基础 UI 语言：
+中大型新设计开始前，用三行写清：
 
 ```text
-styles/
-  tokens.css       # color、spacing、font、radius、shadow scale
-  base.css         # body、text、link、button、input、focus、scrollbar
-  overlays.css     # modal、popover、toast
-  layout.css       # shell、grid、responsive container
+视觉命题：[希望呈现的气质与能量]
+首要任务：[用户进入后最需要理解或完成的事]
+交互强度：[低 / 中 / 高]
 ```
 
-如果使用 Tailwind、CSS modules、styled system 或组件库，可以采用等价结构。
+## 始终生效
 
-## 必备 UI 基础
+- 先建立 typography、spacing、color、control、focus、overlay 和 layout 的基础语言，再扩页面。
+- 通过网格、对齐、尺度、留白和明度建立层级；card 只用于真实独立对象或交互边界。
+- 一个 viewport 保持一个主要焦点，辅助信息主动退后；装饰不能与任务争夺注意力。
+- 加载、空、错误、成功、disabled、focus 等状态必须纳入同一空间骨架，避免跳动和补丁感。
+- 组件按稳定职责拆分；page 负责组合，不承载所有行为、数据和样式。
+- 原生控件不能裸奔，嵌套滚动区、随机圆角、无意义阴影和 card 套 card 默认拒绝。
+- 设计必须在真实浏览器中检查桌面、移动端和关键状态；无法验证时明确说明。
+- 可读性、键盘操作、性能和降级是设计质量的一部分，不是完成后的附加项。
 
-非平凡前端默认统一：
+## 按需加载
 
-- typography scale；
-- spacing scale；
-- color tokens；
-- button variants；
-- input/select/textarea states；
-- disabled/loading/error states；
-- focus rings；
-- modal/dialog 行为，包含 backdrop blur 或 dim；
-- toast 的位置、时长、动画；
-- scrollbar 样式；
-- responsive breakpoints；
-- empty/loading/error/success states。
+| 当前任务 | 追加读取 |
+| --- | --- |
+| 新页面、较大改版、视觉层级弱、需要确定排版或图像方向 | `frontend/visual-composition.md` |
+| 状态反馈、页面转场、复杂滚动、动画、Canvas、3D 或技术库选择 | `frontend/motion-and-interaction.md` |
+| 多端适配、布局重排、交付前浏览器验收或可访问性检查 | `frontend/responsive-and-verification.md` |
 
-## Component 规则
-
-- 一个 component 应有一个稳定职责。
-- 当行为、布局、数据加载、样式缠在一起时要拆。
-- 可复用 stateful logic 提取为 custom hook。
-- pure transform 提取为 utility。
-- page component 是组合入口，不是垃圾桶。
-- 避免无意义 prop drilling；context 或 local store 只有在降低真实复杂度时才使用。
-
-## Layout 规则
-
-- 使用一致的 grid 和 spacing。
-- 对齐必须明显且有意图。
-- 除非产品真的需要，避免多个嵌套滚动区。
-- 优先 page-level scrolling，不把内容藏进奇怪 panel scroll。
-- 移动端和桌面端文本都必须能放下。
-- 按钮在 hover/loading/disabled 等状态下不应乱跳尺寸。
-- 关键控件尺寸要稳定。
-
-## 交互规则
-
-默认期待：
-
-- button 有 hover、active、focus、disabled、loading 状态；
-- destructive action 在可能丢数据时需要确认；
-- toast 平滑进入/退出，并在合理时间后自动消失；
-- modal 需要时 trap focus，并能可预测地关闭；
-- form validation 靠近字段展示，必要时提供 summary-level feedback。
-
-## 浏览器验证
-
-有工具时使用真实浏览器预览。
-
-检查：
-
-- desktop viewport；
-- mobile viewport；
-- first load；
-- error/empty/loading states；
-- modal/toast 行为；
-- scroll 行为；
-- 没有明显 overlap、clipping、不可读文本。
-
-如果浏览器扩展或控制不可用，直接说明。
-
-## 设计方向探索
-
-较大的 UI 任务，可以先做 3-5 个明显不同的方向再深入。
-
-每个方向应在这些方面有实质差异：
-
-- layout；
-- density；
-- navigation model；
-- visual tone；
-- component treatment。
-
-不要做五个只是换颜色的同款弱布局。
+普通样式修复、已有组件内的小改动，在本文件足够时停止扩展上下文。完整新界面通常读取视觉与响应式专题；只有确实存在动效目标时才追加动效专题。

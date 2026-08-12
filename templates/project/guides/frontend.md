@@ -1,39 +1,33 @@
 # 前端指南
 
-## 质量底线
+本文件是当前项目的前端入口与激活配置。默认只读本文件；只有任务命中时才继续读取 `frontend/` 下的专题。
 
-避免通用 AI 味前端：
+## 项目配置
 
-- 随机圆角卡片；
-- 用 left-border 假装层级；
-- card 套 card；
-- 间距不一致；
-- 对齐混乱；
-- 超长且失控的 div；
-- 糟糕的内置滚动区；
-- 原生控件裸奔；
-- 没有系统性的假苹果味。
+首次开展中大型前端工作时填写；随着产品阶段变化更新，不适用项保持空白。
 
-## 基础 UI 语言
+```text
+产品类型：[效率型 / 数据型 / 内容型 / 品牌营销型 / 叙事实验型]
+视觉命题：[]
+首要任务：[]
+交互强度：[低 / 中 / 高]
+重点 viewport：[]
+已采用的 UI / motion 方案：[]
+```
 
-前端开发应该先建立基础 UI 语言：
+## 始终生效
 
-- typography；
-- spacing scale；
-- colors；
-- buttons；
-- inputs；
-- focus states；
-- modal/dialog；
-- toast/notification；
-- scrollbar；
-- layout shell；
-- responsive behavior。
+- 先建立 typography、spacing、color、control、focus、overlay 和 layout 语言，再扩页面。
+- 用对齐、尺度、留白和明度建立层级；card 只用于真实独立对象或交互边界。
+- 一个 viewport 保持一个主要焦点，辅助信息和装饰主动退后。
+- loading、empty、error、success、disabled、focus 等状态不能事后补。
+- 原生控件不能裸奔；随机圆角、无意义阴影、card 套 card 和奇怪内部滚动默认拒绝。
+- 使用真实浏览器验证关键桌面、移动端和交互状态；无法验证时说明风险。
 
-较大的前端任务可以先预写 3-5 个明显不同的风格/布局方向，供初筛后再深入实现。
+## 按需加载
 
-## 浏览器验证
+- 新页面、较大改版、排版、图像或视觉层级：`frontend/visual-composition.md`
+- 状态反馈、转场、复杂滚动、动画、Canvas、3D 或技术库选择：`frontend/motion-and-interaction.md`
+- 多端适配、布局重排、交付验收和可访问性：`frontend/responsive-and-verification.md`
 
-- Web 预览优先使用真实浏览器扩展/控制。
-- 如果预期使用真实浏览器，不要静默退回内部预览。
-- 遇到 CAPTCHA、密码、MFA、人机验证时停下来，让用户操作。
+普通样式修复或已有组件内的小改动，在本文件足够时停止扩展上下文。

@@ -54,6 +54,7 @@ review、audit、debug、hardening：
 前端、UI、浏览器验证：
 
 - `style/frontend-baseline.md`
+- 由其中的任务路由按需读取 `style/frontend/` 专题，不默认全量加载
 - `workflows/verification-baseline.md`
 
 第三方参考源码、方案借鉴、AI context：

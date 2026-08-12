@@ -62,6 +62,10 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 ├─ style/
 │  ├─ code-architecture-baseline.md
 │  ├─ frontend-baseline.md
+│  ├─ frontend/
+│  │  ├─ visual-composition.md
+│  │  ├─ motion-and-interaction.md
+│  │  └─ responsive-and-verification.md
 │  └─ git-style.md
 ├─ scripts/
 │  ├─ awz.bat

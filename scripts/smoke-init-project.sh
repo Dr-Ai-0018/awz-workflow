@@ -39,7 +39,7 @@ bash "$initializer" --target "$smoke_path" --name "AWZ Init Smoke"
 [[ -d "$smoke_path/.git" ]] || die 'Git repository was not initialized'
 [[ "$(git -C "$smoke_path" symbolic-ref --short HEAD)" == 'main' ]] || die 'Git branch is not main'
 
-for path in AGENTS.md CLAUDE.md docs docs/references/README.md docs/agent-room/room-ledger.py docs/agent-room/guides/room-ledger.md temp .env; do
+for path in AGENTS.md CLAUDE.md docs docs/references/README.md docs/agent-room/room-ledger.py docs/agent-room/guides/room-ledger.md docs/agent-room/guides/frontend.md docs/agent-room/guides/frontend/visual-composition.md docs/agent-room/guides/frontend/motion-and-interaction.md docs/agent-room/guides/frontend/responsive-and-verification.md temp .env; do
     git -C "$smoke_path" check-ignore -q -- "$path" || die "$path should be ignored"
 done
 
@@ -70,6 +70,7 @@ printf '%s\n' '{"schemaVersion":1,"references":[{"id":"custom"}]}' > "$smoke_pat
 printf '%s\n' 'custom project context' > "$smoke_path/docs/references/README.md"
 printf '%s\n' 'custom project status' > "$smoke_path/docs/agent-room/status.md"
 printf '%s\n' 'custom collaboration strategy' > "$smoke_path/docs/agent-room/guides/collaboration.md"
+printf '%s\n' 'custom frontend profile' > "$smoke_path/docs/agent-room/guides/frontend.md"
 bash "$initializer" --target "$smoke_path" --mode existing --force
 [[ "$(<"$smoke_path/README.md")" == 'custom local README' ]] || die '--force overwrote a protected project README'
 if grep -Fq 'custom local AGENTS' "$smoke_path/AGENTS.md"; then
@@ -79,6 +80,7 @@ grep -Fq '"id":"custom"' "$smoke_path/.awz/references.json" || die '--force over
 grep -Fq 'custom project context' "$smoke_path/docs/references/README.md" || die '--force overwrote project-owned docs/references/README.md'
 grep -Fq 'custom project status' "$smoke_path/docs/agent-room/status.md" || die '--force overwrote project-owned status.md'
 grep -Fq 'custom collaboration strategy' "$smoke_path/docs/agent-room/guides/collaboration.md" || die '--force overwrote project-owned collaboration strategy'
+grep -Fq 'custom frontend profile' "$smoke_path/docs/agent-room/guides/frontend.md" || die '--force overwrote project-owned frontend profile'
 
 mkdir -p "$occupied_path"
 printf '%s\n' 'preserve me' > "$occupied_path/valuable.txt"

@@ -56,7 +56,7 @@ try {
     $branch = git -C $smokePath symbolic-ref --short HEAD
     Assert-True ($branch -eq "main") "Git branch is not main"
 
-    foreach ($path in @("AGENTS.md", "CLAUDE.md", "docs", "docs/references/README.md", "docs/agent-room/room-ledger.py", "docs/agent-room/guides/room-ledger.md", "temp", ".env")) {
+    foreach ($path in @("AGENTS.md", "CLAUDE.md", "docs", "docs/references/README.md", "docs/agent-room/room-ledger.py", "docs/agent-room/guides/room-ledger.md", "docs/agent-room/guides/frontend.md", "docs/agent-room/guides/frontend/visual-composition.md", "docs/agent-room/guides/frontend/motion-and-interaction.md", "docs/agent-room/guides/frontend/responsive-and-verification.md", "temp", ".env")) {
         Assert-Ignored $path
     }
 
@@ -94,11 +94,13 @@ try {
     $projectContextPath = Join-Path $smokePath "docs/references/README.md"
     $projectStatusPath = Join-Path $smokePath "docs/agent-room/status.md"
     $collaborationPath = $generatedCollaborationPath
+    $frontendGuidePath = Join-Path $smokePath "docs/agent-room/guides/frontend.md"
     Set-Content -LiteralPath $referenceMapPath -Value '{"schemaVersion":1,"references":[{"id":"custom"}]}' -Encoding UTF8
     Set-Content -LiteralPath $agentsPath -Value "custom local AGENTS" -Encoding UTF8
     Set-Content -LiteralPath $projectContextPath -Value "custom project context" -Encoding UTF8
     Set-Content -LiteralPath $projectStatusPath -Value "custom project status" -Encoding UTF8
     Set-Content -LiteralPath $collaborationPath -Value "custom collaboration strategy" -Encoding UTF8
+    Set-Content -LiteralPath $frontendGuidePath -Value "custom frontend profile" -Encoding UTF8
     & $initializer -TargetPath $smokePath -Mode Existing -Force
     Assert-True ((Get-Content -LiteralPath $readmePath -Raw -Encoding UTF8).Trim() -eq "custom local README") "-Force overwrote a protected project README"
     Assert-True (-not ((Get-Content -LiteralPath $agentsPath -Raw -Encoding UTF8).Contains("custom local AGENTS"))) "-Force did not refresh AWZ-managed AGENTS.md"
@@ -106,6 +108,7 @@ try {
     Assert-True ((Get-Content -LiteralPath $projectContextPath -Raw -Encoding UTF8).Contains("custom project context")) "-Force overwrote project-owned docs/references/README.md"
     Assert-True ((Get-Content -LiteralPath $projectStatusPath -Raw -Encoding UTF8).Contains("custom project status")) "-Force overwrote project-owned status.md"
     Assert-True ((Get-Content -LiteralPath $collaborationPath -Raw -Encoding UTF8).Contains("custom collaboration strategy")) "-Force overwrote project-owned collaboration strategy"
+    Assert-True ((Get-Content -LiteralPath $frontendGuidePath -Raw -Encoding UTF8).Contains("custom frontend profile")) "-Force overwrote project-owned frontend profile"
 
     New-Item -ItemType Directory -Path $occupiedPath | Out-Null
     Set-Content -LiteralPath (Join-Path $occupiedPath "valuable.txt") -Value "preserve me" -Encoding UTF8
