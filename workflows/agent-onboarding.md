@@ -7,16 +7,15 @@
 - `AGENTS.md` 是入口，不是百科全书。
 - 先读短规则，再按任务类型读取相关细则。
 - 不需要每次都读完所有文档；高风险、大范围、多 Agent 协作时再扩大阅读范围。
-- 读完后要在 `docs/agent-room/status.md` 或 handoff 中写回自己的理解、范围和验证计划。
+- 较大任务开始、owner/阶段变化或需要交接时，再在 `docs/agent-room/status.md` 或 handoff 写回理解、范围和验证计划；小任务不机械制造回执。
 
 ## 默认阅读顺序
 
 1. `AGENTS.md`：读取本项目硬规则、仓库边界、Git 禁区和工具默认值。
 2. `CLAUDE.md`：如果当前 Agent 是 Claude Code，确认是否导入了 `AGENTS.md` 和额外限制。
 3. `README.md`：理解公开项目目标、运行方式和共享约定。
-4. `docs/references/README.md`：理解稳定背景、目标边界、术语、约束和资料来源。
-5. `docs/agent-room/status.md`：理解当前阶段、owner、dirty state、阻塞项和下一步。
-6. 根据任务类型读取补充材料。
+4. `docs/agent-room/status.md`：理解当前阶段、owner、dirty state、阻塞项、下一步和恢复指针。
+5. 只读取 status 或当前任务明确指向的 references、decision、handoff、review、plan 和补充规则。
 
 ## 任务类型到文档映射
 
@@ -43,8 +42,8 @@ Ubuntu/VPS 初始化、release 包或远端发布：
 review、audit、debug、hardening：
 
 - `workflows/review-and-fix.md`
-- `workflows/verification-baseline.md`
-- `docs/agent-room/reviews/`
+- 改代码或验证行为时，再读 `workflows/verification-baseline.md`
+- 跨多轮、包含修复或需要持续追踪时，再维护 `docs/agent-room/reviews/`
 
 代码架构、拆分、重构：
 
@@ -82,6 +81,20 @@ Owner：
 ```
 
 小任务可以不写完整回执，但最终回复仍要说明读了哪些关键上下文、跑了哪些验证。
+
+## 阶段收口与恢复
+
+Checkpoint 是人为选择的语义边界，不是 token 阈值，也不替代 Harness 自己的 compaction。出现以下任一情况时做一次阶段收口：
+
+- 一个 feature 完成，或 root cause 已确认；
+- 关键架构/方案决策落定，或一轮实验结束；
+- 准备换 Agent、换会话、暂停较大任务或进入下一阶段。
+
+收口时先核对真实代码、配置、Git 和验证结果，再更新 `docs/agent-room/status.md`：当前目标与阶段、已完成、已验证事实、当前有效状态、branch/commit/dirty state、未解决项、下一步 1–3 项，以及恢复工作必须先读的入口。
+
+其他材料只在职责命中时更新：有长期取舍才写 decision/ADR；发生责任交接或跨会话继续才写 handoff；需要追溯的协作事件才进 ledger；稳定背景、约束或资料来源变化时才更新 references。低风险小改若不改变阶段、owner 或长期事实，不必制造 checkpoint 文档。
+
+新 Agent 或新会话恢复时，按 `AGENTS.md` → `README.md` → `docs/agent-room/status.md` → status 指向的 references/decision/handoff/review/plan → 当前任务 guide 读取。没有明确指针时，不为“补上下文”遍历旧聊天和历史草稿。
 
 ## 信息归属与单一来源
 

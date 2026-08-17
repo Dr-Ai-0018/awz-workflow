@@ -43,25 +43,35 @@ try {
         Pop-Location
     }
 
-    & $initializer -TargetPath $smokePath -ProjectName "AWZ Init Smoke" -DryRun
+    & $initializer -TargetPath $smokePath -ProjectName "Init Smoke Project" -DryRun
     Assert-True (-not (Test-Path -LiteralPath $smokePath)) "DryRun created the target directory"
 
     & $batchInitializer -TargetPath $batchSmokePath -ProjectName "AWZ Batch Smoke" -DryRun
     Assert-True ($LASTEXITCODE -eq 0) "Batch wrapper dry-run failed"
     Assert-True (-not (Test-Path -LiteralPath $batchSmokePath)) "Batch wrapper dry-run created the target directory"
 
-    & $initializer -TargetPath $smokePath -ProjectName "AWZ Init Smoke"
+    & $initializer -TargetPath $smokePath -ProjectName "Init Smoke Project"
     Assert-True (Test-Path -LiteralPath (Join-Path $smokePath ".git")) "Git repository was not initialized"
 
     $branch = git -C $smokePath symbolic-ref --short HEAD
     Assert-True ($branch -eq "main") "Git branch is not main"
 
-    foreach ($path in @("AGENTS.md", "CLAUDE.md", "docs", "docs/references/README.md", "docs/agent-room/room-ledger.py", "docs/agent-room/guides/room-ledger.md", "docs/agent-room/guides/frontend.md", "docs/agent-room/guides/frontend/visual-composition.md", "docs/agent-room/guides/frontend/motion-and-interaction.md", "docs/agent-room/guides/frontend/responsive-and-verification.md", "temp", ".env")) {
+    foreach ($path in @("AGENTS.md", "CLAUDE.md", "docs", "docs/references/README.md", "docs/agent-room/room-ledger.py", "docs/agent-room/guides/room-ledger.md", "docs/agent-room/guides/file-search.md", "docs/agent-room/guides/frontend.md", "docs/agent-room/guides/frontend/visual-composition.md", "docs/agent-room/guides/frontend/motion-and-interaction.md", "docs/agent-room/guides/frontend/responsive-and-verification.md", "temp", ".env")) {
         Assert-Ignored $path
     }
 
     $agentsContent = Get-Content -LiteralPath (Join-Path $smokePath "AGENTS.md") -Raw -Encoding UTF8
     Assert-True ($agentsContent.Contains("docs/references/README.md")) "AGENTS.md does not expose the reference index entry"
+    $statusIndex = $agentsContent.IndexOf("docs/agent-room/status.md")
+    $referencesIndex = $agentsContent.IndexOf("docs/references/README.md")
+    Assert-True ($statusIndex -ge 0) "AGENTS.md does not expose the status entry"
+    Assert-True ($referencesIndex -ge 0) "AGENTS.md does not expose the reference index entry"
+    Assert-True ($statusIndex -lt $referencesIndex) "AGENTS.md does not route through status before optional references"
+    $generatedReadme = Get-Content -LiteralPath (Join-Path $smokePath "README.md") -Raw -Encoding UTF8
+    Assert-True ($generatedReadme.Contains("# Init Smoke Project")) "README.md did not render the project name"
+    Assert-True ($generatedReadme.Contains("项目简介 / Overview")) "README.md is missing the bilingual placeholder structure"
+    Assert-True (-not $generatedReadme.Contains("AWZ")) "README.md exposes the initializer identity"
+    Assert-True (-not $generatedReadme.Contains(".awz/")) "README.md exposes internal reference mapping"
     $generatedCollaborationPath = Join-Path $smokePath "docs/agent-room/guides/collaboration.md"
     $generatedCollaboration = Get-Content -LiteralPath $generatedCollaborationPath -Raw -Encoding UTF8
     foreach ($modeLabel in @("单 Agent", "双 Agent", "三 Agent", "四个及以上 Agent")) {

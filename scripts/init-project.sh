@@ -247,6 +247,7 @@ local_files=(
     'guides/repository-hygiene.md|docs/agent-room/guides/repository-hygiene.md|false'
     'guides/git-workflow.md|docs/agent-room/guides/git-workflow.md|false'
     'guides/verification.md|docs/agent-room/guides/verification.md|false'
+    'guides/file-search.md|docs/agent-room/guides/file-search.md|false'
     'guides/code-architecture.md|docs/agent-room/guides/code-architecture.md|false'
     'guides/frontend.md|docs/agent-room/guides/frontend.md|false|true'
     'guides/frontend/visual-composition.md|docs/agent-room/guides/frontend/visual-composition.md|false'

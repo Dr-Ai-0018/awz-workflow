@@ -6,8 +6,8 @@
 
 1. `AGENTS.md`：始终生效的硬规则和信息边界。
 2. `README.md`：公开项目目标、用法和已验证命令。
-3. `docs/references/README.md`：稳定背景、目标、非目标、术语、约束和资料来源。
-4. `docs/agent-room/status.md`：当前阶段、owner、dirty state、阻塞项和下一步。
+3. `docs/agent-room/status.md`：当前阶段、owner、dirty state、阻塞项、下一步和恢复指针。
+4. 只继续读取 status 或当前任务明确指向的 references、decision、handoff、review、plan 和 guide。
 
 ## 按任务继续读
 
@@ -15,7 +15,7 @@
 
 - `docs/README.md`
 - `docs/agent-room/guides/repository-hygiene.md`
-- `docs/agent-room/guides/verification.md`
+- 实际改动初始化器、生成器或验证行为时，再读 `docs/agent-room/guides/verification.md`
 
 多 Agent 协作：
 
@@ -27,8 +27,9 @@
 review、debug、hardening：
 
 - `docs/agent-room/guides/review.md`
-- `docs/agent-room/guides/blockers-and-safety.md`
-- `docs/agent-room/reviews/review-checklist.template.md`
+- 只读、一次性 review 到此即可
+- 涉及真实安全风险、权限、破坏性操作或阻塞时，再读 `docs/agent-room/guides/blockers-and-safety.md`
+- 跨多轮、包含修复或需要持续追踪时，再使用 `docs/agent-room/reviews/review-checklist.template.md`
 
 后端、架构、重构：
 
@@ -51,6 +52,10 @@ Git、分支、commit、版本：
 
 - `docs/agent-room/guides/git-workflow.md`
 
+跨目录、跨盘或未知位置查找文件：
+
+- `docs/agent-room/guides/file-search.md`
+
 大阶段或发布：
 
 - `docs/agent-room/guides/git-workflow.md`
@@ -72,3 +77,14 @@ Git、分支、commit、版本：
 - 普通 room 时间线：只能使用 `room-ledger.py append`，不要为每轮聊天新建文件。
 
 不要机械读取所有文件，也不要把背景事实复制到 status、handoff 和多个 guide 中形成互相漂移的副本。
+
+## 阶段收口与恢复
+
+Checkpoint 按语义边界触发，不按 token 数触发，也不接管 Harness 的 compaction。feature 完成、root cause 确认、关键决策落定、实验结束、换 Agent/会话或切换阶段时：
+
+1. 核对真实代码、配置、Git 和验证结果；
+2. 更新 `status.md` 的阶段快照、已验证事实、有效状态、未解决项、下一步和恢复入口；
+3. 只有职责命中时才更新 decision、handoff、ledger 或 references，不机械全写；
+4. 新会话按 `AGENTS.md` → `README.md` → `status.md` → status 指向的 references/decision/handoff/review/plan → 当前任务 guide 恢复，不默认遍历旧聊天。
+
+低风险小改若不改变阶段、owner 或长期事实，最终说明验证结果即可，不必制造 checkpoint 文档。

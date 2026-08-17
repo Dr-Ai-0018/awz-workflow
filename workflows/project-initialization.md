@@ -59,7 +59,7 @@ scripts\init-project.bat -TargetPath "E:\Project\Example" -ProjectName "Example"
 - 本地 ignored `temp/`；
 - 可提交 `.awz/references.json`，默认没有任何映射；
 - license，默认 MIT；
-- README，包含 quickstart 和常用命令。
+- README，中英文项目占位骨架；真实项目按产品、安装、部署、贡献和合规需求自由增删或完整重写。
 
 注意：必需基线不包含 `pyproject.toml`、`package.json`、Docker、CI 或部署配置。
 

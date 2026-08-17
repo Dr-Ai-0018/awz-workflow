@@ -16,6 +16,7 @@
 - Reference Library 的项目映射、离线状态检查、结构化 plan/result 和跨平台管理入口。
 - 初始化项目新增统一的 `docs/references/` 背景与资料入口，Reference Library context 同目录生成。
 - Agent 协作规则支持单 Agent、双 Agent、三 Agent 与四个以上团队按实际 model/harness 能力动态选择策略。
+- 以语义边界触发的阶段收口与恢复链，不依赖 token 阈值或 Harness compaction。
 
 ### Fixed
 
@@ -32,8 +33,11 @@
 
 - 精简发布工作流中的历史实施叙述，改为当前发布基线与后续发布流程。
 - 收敛初始化项目的 `AGENTS.md` 为硬规则和阅读路由，详细工具、架构与前端规则按需从 guides 加载。
+- 初始化 README 改为中英文项目占位骨架，不再暴露 AWZ、Agent 工作区或未选择的工具链；真实项目需求可完整重写。
+- 新人恢复链改为先读 status 再按指针挂载 references、review、plan 和专题规则；文件搜索拆为独立按需 guide。
 - PowerShell 与 POSIX 初始化器统一为 `New`/`Existing` 双模式，并在首次写入前校验完整模板集。
 - Windows TUI 收敛为编号选择与原生单行输入的分步终端向导，保留 DryRun、危险确认、完整日志和完成/错误页面。
+- status 与 handoff 模板补充验证事实、当前有效状态、Git 状态和恢复入口。
 
 ## [0.2.0] - 2026-07-12
 

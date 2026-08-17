@@ -229,6 +229,7 @@ $localFiles = @(
     @{ Source = "guides/repository-hygiene.md"; Dest = "docs/agent-room/guides/repository-hygiene.md"; Render = $false },
     @{ Source = "guides/git-workflow.md"; Dest = "docs/agent-room/guides/git-workflow.md"; Render = $false },
     @{ Source = "guides/verification.md"; Dest = "docs/agent-room/guides/verification.md"; Render = $false },
+    @{ Source = "guides/file-search.md"; Dest = "docs/agent-room/guides/file-search.md"; Render = $false },
     @{ Source = "guides/code-architecture.md"; Dest = "docs/agent-room/guides/code-architecture.md"; Render = $false },
     @{ Source = "guides/frontend.md"; Dest = "docs/agent-room/guides/frontend.md"; Render = $false; ProtectInExisting = $true },
     @{ Source = "guides/frontend/visual-composition.md"; Dest = "docs/agent-room/guides/frontend/visual-composition.md"; Render = $false },

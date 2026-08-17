@@ -7,6 +7,7 @@ AWZ Workflow 是程林自己的个人开发工作流基线，用来把长期和 
 - 新项目启动时，不再每次重新训 AI；
 - 不同 model 与 harness 可以按数量、能力和任务风险动态协作；
 - 多个 Agent 有本地交流区，可以对齐状态、handoff、review 和决策；
+- 在语义阶段边界留下可恢复快照，不依赖某个 Harness 的 token 或 compaction 实现；
 - 仓库默认干净，不把密钥、本地文档、临时产物塞进 git；
 - 代码默认现代、可测、可拆、能维护；
 - 前端不再长出那种一眼 AI 味的圆角卡片拼盘。
@@ -19,7 +20,8 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 2. 再决定用哪个 Agent、什么工具、怎么分工；
 3. 小步实现，避免不可 review 的大改；
 4. 用真实命令、真实浏览器、真实测试给出证据；
-5. 交接时说清楚做了什么、验证了什么、哪里还不确定。
+5. 在 feature、决策、实验或责任边界收口当前事实；
+6. 交接时说清楚做了什么、验证了什么、哪里还不确定。
 
 规则可以例外，但例外必须说清楚原因、风险和后续处理。
 
@@ -33,6 +35,7 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 - 本地 ignored `AGENTS.md` / `CLAUDE.md` 指令文件；
 - `docs/agent-room/` 交流区、handoff 和 review checklist；
 - append-only room ledger、并发追加和历史篡改检测；
+- 以语义边界触发的阶段收口与新会话恢复链；
 - 单 Agent、双 Agent、三 Agent 与多 Agent 团队的自适应协作方式；
 - git 分支、阶段、版本和 commit 节奏；
 - 代码架构和文件复杂度基线；
@@ -42,6 +45,10 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 - 位于业务项目之外、可跨项目映射的 Reference Library。
 
 它暂时不追求成为完整脚手架、CI 平台或文档站。
+
+## 阶段收口
+
+AWZ 的 checkpoint 是轻量的信息收口约定，不监测 token，不介入 Codex、Claude Code、OpenCode 等 Harness 的上下文压缩。feature 完成、root cause 确认、关键决策落定、实验结束、换 Agent/会话或切换阶段时，先以真实代码、Git 和验证结果更新 `docs/agent-room/status.md`；decision、handoff、ledger 与 references 只在各自职责命中时更新。新会话从短入口和 status 指针恢复，不默认重读全部旧聊天。详细规则见 [Agent Onboarding 工作流](workflows/agent-onboarding.md)。
 
 ## 仓库结构
 
@@ -127,6 +134,8 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 当前发布版本由 `VERSION` 管理。Windows 使用 `scripts/init-project.ps1`，也可通过薄封装 `scripts/init-project.bat` 从 `cmd` 调用；Ubuntu/POSIX 使用 `scripts/init-project.sh`。默认新项目模式只接受不存在或空目录，已有项目必须显式选择 `Existing` 模式；两端都先运行 dry-run，再进行真实初始化。跨平台 release 包和 VPS 使用方式见 [Release 与 VPS 初始化工作流](workflows/release-and-vps.md)。每个正式 tag 都必须经过两端初始化器、解压隔离 smoke 和 release 包验证。
 
 模板或初始化器变更后，先运行对应平台的轻量回归 smoke：`./scripts/smoke-init-project.ps1` 或 `bash scripts/smoke-init-project.sh`。它只验证初始化器本身，不替代 release 前的解压隔离 smoke。
+
+初始化生成的项目 README 只提供中英文占位骨架，不声明 AWZ、Agent 工作区或默认技术栈。真实项目应按产品、安装、部署、贡献和合规需求自由增删或完整重写。
 
 ## 参考项目库
 

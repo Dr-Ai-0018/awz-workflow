@@ -32,18 +32,29 @@ cleanup() {
 }
 trap cleanup EXIT
 
-bash "$initializer" --target "$smoke_path" --name "AWZ Init Smoke" --dry-run
+bash "$initializer" --target "$smoke_path" --name "Init Smoke Project" --dry-run
 [[ ! -e "$smoke_path" ]] || die 'DryRun created the target directory'
 
-bash "$initializer" --target "$smoke_path" --name "AWZ Init Smoke"
+bash "$initializer" --target "$smoke_path" --name "Init Smoke Project"
 [[ -d "$smoke_path/.git" ]] || die 'Git repository was not initialized'
 [[ "$(git -C "$smoke_path" symbolic-ref --short HEAD)" == 'main' ]] || die 'Git branch is not main'
 
-for path in AGENTS.md CLAUDE.md docs docs/references/README.md docs/agent-room/room-ledger.py docs/agent-room/guides/room-ledger.md docs/agent-room/guides/frontend.md docs/agent-room/guides/frontend/visual-composition.md docs/agent-room/guides/frontend/motion-and-interaction.md docs/agent-room/guides/frontend/responsive-and-verification.md temp .env; do
+for path in AGENTS.md CLAUDE.md docs docs/references/README.md docs/agent-room/room-ledger.py docs/agent-room/guides/room-ledger.md docs/agent-room/guides/file-search.md docs/agent-room/guides/frontend.md docs/agent-room/guides/frontend/visual-composition.md docs/agent-room/guides/frontend/motion-and-interaction.md docs/agent-room/guides/frontend/responsive-and-verification.md temp .env; do
     git -C "$smoke_path" check-ignore -q -- "$path" || die "$path should be ignored"
 done
 
 grep -Fq 'docs/references/README.md' "$smoke_path/AGENTS.md" || die 'AGENTS.md does not expose the reference index entry'
+status_line=$(grep -n -m1 'docs/agent-room/status.md' "$smoke_path/AGENTS.md" | cut -d: -f1)
+references_line=$(grep -n -m1 'docs/references/README.md' "$smoke_path/AGENTS.md" | cut -d: -f1)
+[[ "$status_line" -lt "$references_line" ]] || die 'AGENTS.md does not route through status before optional references'
+grep -Fq '# Init Smoke Project' "$smoke_path/README.md" || die 'README.md did not render the project name'
+grep -Fq '项目简介 / Overview' "$smoke_path/README.md" || die 'README.md is missing the bilingual placeholder structure'
+if grep -Fq 'AWZ' "$smoke_path/README.md"; then
+    die 'README.md exposes the initializer identity'
+fi
+if grep -Fq '.awz/' "$smoke_path/README.md"; then
+    die 'README.md exposes internal reference mapping'
+fi
 for mode_label in '单 Agent' '双 Agent' '三 Agent' '四个及以上 Agent'; do
     grep -Fq "$mode_label" "$smoke_path/docs/agent-room/guides/collaboration.md" || die "collaboration strategy is missing mode: $mode_label"
 done

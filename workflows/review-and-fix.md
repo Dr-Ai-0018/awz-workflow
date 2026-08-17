@@ -26,7 +26,7 @@
 
 ## Checklist 文档
 
-多步骤 review 时，在目标项目 ignored `docs/` 下创建或更新本地 checklist。
+一次性只读 review 可以直接报告发现。跨多轮、包含修复或需要持续追踪时，在目标项目 ignored `docs/` 下创建或更新本地 checklist。
 
 推荐形状：
 

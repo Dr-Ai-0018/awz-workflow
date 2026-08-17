@@ -1,6 +1,6 @@
 # Review 指南
 
-多步骤 review 必须维护 ignored `docs/agent-room/reviews/` 内的 checklist。
+一次性只读 review 可以直接报告发现；跨多轮、包含修复或需要持续追踪时，维护 ignored `docs/agent-room/reviews/` 内的 checklist。
 
 ## 优先级
 
