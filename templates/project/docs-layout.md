@@ -17,14 +17,14 @@ docs/
 │  ├─ reviews/
 │  ├─ decisions/
 │  └─ notes/
-└─ plans/                       # 阶段计划与 checklist
+└─ plans/                       # 通用阶段计划与 checklist
 ```
 
 ## 放置规则
 
 - “这个项目长期是什么、为什么这样、结论来自哪里”：`references/`。
 - “现在谁在做什么、哪里卡住”：`agent-room/status.md`。
-- “本轮任务怎么推进”：`plans/` 或 `agent-room/reviews/`。
+- “本轮任务怎么推进”：status 只指向一个主 checklist；普通计划放 `plans/`，专项 review 放 `agent-room/reviews/`，只有独立切片确实需要时才拆副清单。
 - “Agent 之间需要追溯的消息”：通过 `room-ledger.py` 追加到 `room.ndjson`。
 - “可清理的大文件或生成物”：放 `temp/`，只在这里留下索引。
 

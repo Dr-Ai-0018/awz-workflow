@@ -6,6 +6,15 @@ die() {
     exit 1
 }
 
+assert_single_trailing_line_break() {
+    local path=$1
+    local ending
+
+    ending=$(tail -c 2 "$path" | od -An -t x1 | tr -d ' \n')
+    [[ "$ending" == *0a ]] || die "$path does not end with a line break"
+    [[ "$ending" != '0a0a' ]] || die "$path ends with an extra blank line"
+}
+
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 root=$(cd "$script_dir/.." && pwd -P)
 initializer="$script_dir/init-project.sh"
@@ -55,6 +64,18 @@ fi
 if grep -Fq '.awz/' "$smoke_path/README.md"; then
     die 'README.md exposes internal reference mapping'
 fi
+grep -Fq '开发环境基线' "$smoke_path/docs/references/README.md" || die 'reference index is missing the development environment baseline'
+grep -Fq 'guides/verification.md' "$smoke_path/docs/references/README.md" || die 'reference index is missing the cold verification pointer'
+grep -Fq 'executable/version' "$smoke_path/docs/agent-room/guides/verification.md" || die 'verification guide is missing shell environment details'
+grep -Fq '项目构建启动顺序' "$smoke_path/docs/agent-room/onboarding.md" || die 'onboarding is missing the probe-before-build route'
+grep -Fq '主线与插入请求' "$smoke_path/docs/agent-room/onboarding.md" || die 'onboarding is missing mainline continuity rules'
+grep -Fq '主 Checklist' "$smoke_path/docs/agent-room/status.md" || die 'status is missing the primary checklist pointer'
+if grep -Fq -- '- [ ]' "$smoke_path/docs/agent-room/status.md"; then
+    die 'status contains a competing embedded checklist'
+fi
+for path in README.md LICENSE docs/agent-room/status.md; do
+    assert_single_trailing_line_break "$smoke_path/$path"
+done
 for mode_label in '单 Agent' '双 Agent' '三 Agent' '四个及以上 Agent'; do
     grep -Fq "$mode_label" "$smoke_path/docs/agent-room/guides/collaboration.md" || die "collaboration strategy is missing mode: $mode_label"
 done

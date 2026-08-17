@@ -17,6 +17,22 @@
 4. `docs/agent-room/status.md`：理解当前阶段、owner、dirty state、阻塞项、下一步和恢复指针。
 5. 只读取 status 或当前任务明确指向的 references、decision、handoff、review、plan 和补充规则。
 
+## 项目构建启动顺序
+
+首次构建、已有项目接入或跨多步骤任务，除非用户明确要求直接处理一个孤立小事，默认执行：
+
+1. **探测**：核对真实目录/代码、Git/dirty state、OS 与 shell、编码/行尾、实际 runtime/package manager、启动和验证入口。
+2. **必要沉淀**：稳定环境与项目事实写入 `docs/references/README.md`；当前阶段、owner、范围和阻塞写入 status。已有且仍有效的事实不重复制造副本。
+3. **锁定主线**：建立一个由 status 指向的主 checklist；普通计划放 `docs/plans/`，专项 review 可放 `docs/agent-room/reviews/`。副清单只服务确实独立的切片，并反向链接主清单。
+4. **实现与验证**：按主 checklist 小步推进、验证、review 和收口。
+
+低风险单步任务、纯回答或已有可信环境基线的重复操作，可以省略无意义的探测与写回。环境、编码与文本写入细则按需读取 `workflows/verification-baseline.md`。
+
+## 主线与插入请求
+
+- 用户当前明确目标优先；status 和主 checklist 只保存连续性。用户明确取消、替换或重定义目标时，及时迁移主线，不能用旧计划对抗新决定。
+- 其余新消息视为补充或插入请求：可以先回应，随后回到未完成主线；若与主线冲突、显著扩权或改变交付物，先说明影响并确认。
+
 ## 任务类型到文档映射
 
 初始化或整理项目：
@@ -105,7 +121,7 @@ Checkpoint 是人为选择的语义边界，不是 token 阈值，也不替代 H
 | 本地稳定背景、约束、术语、资料证据 | `docs/references/README.md` | status、notes |
 | 当前阶段、owner、dirty state、阻塞项 | `docs/agent-room/status.md` | README、长期背景副本 |
 | 特定任务的操作方法 | `docs/agent-room/guides/` | `AGENTS.md` 全量复制 |
-| 阶段计划与验收项 | `docs/plans/` 或 `docs/agent-room/reviews/` | room 普通聊天 |
+| 当前主线、阶段计划与验收项 | status 指向的唯一主 checklist；普通计划用 `docs/plans/`，专项 review 可用 `docs/agent-room/reviews/` | room 普通聊天、多份平行主计划 |
 | 方案取舍及原因 | decision/ADR | 代码注释长篇复述 |
 | 可清理产物、截图、实验与日志 | `temp/` | docs 正文、git |
 
@@ -117,4 +133,4 @@ Checkpoint 是人为选择的语义边界，不是 token 阈值，也不替代 H
 
 - 小任务：`AGENTS.md` + 相关代码；
 - 中等任务：再读对应 `workflows/` 或 `style/`；
-- 大任务：读需求沉淀、工作流、风格基线，并维护 `docs/agent-room/status.md`。
+- 大任务：读需求沉淀、工作流、风格基线，并维护 status 指向的单一主 checklist。

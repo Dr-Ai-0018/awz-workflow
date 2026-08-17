@@ -10,6 +10,12 @@
 
 优先运行项目已经定义的 test、lint、typecheck、build、health check 或浏览器入口；具体命令以当前项目事实为准。
 
+## 环境与文本写入
+
+- 首次构建、已有项目接入或环境变化时，探测 OS、实际 shell executable/version、编码/行尾、runtime/package manager 和验证入口，再把有效事实写入 `docs/references/README.md`。
+- PowerShell、cmd 与 Bash 的引号和转义不能互相照搬。PowerShell 的“反引号 + n”只在正确的可展开字符串中表示换行；Windows PowerShell 5.1 与 PowerShell 7 的默认编码也可能不同。
+- 多行文档优先用结构化 edit/patch；必须经 shell 写入时立即回读实际字符、编码和行尾。生成器还应增加文件尾或字节级回归断言。
+
 ## 按需扩展
 
 - 前端视觉、交互、多端和可访问性：读 `frontend/responsive-and-verification.md`。

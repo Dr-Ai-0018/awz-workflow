@@ -32,6 +32,14 @@ function Assert-Ignored {
     Assert-True ($LASTEXITCODE -eq 0) "$Path should be ignored"
 }
 
+function Assert-SingleTrailingLineBreak {
+    param([string]$Path)
+
+    $content = [IO.File]::ReadAllText($Path).Replace("`r`n", "`n").Replace("`r", "`n")
+    Assert-True ($content.EndsWith("`n")) "$Path does not end with a line break"
+    Assert-True (-not $content.EndsWith("`n`n")) "$Path ends with an extra blank line"
+}
+
 try {
     New-Item -ItemType Directory -Path $helpProbePath | Out-Null
     Push-Location $helpProbePath
@@ -69,13 +77,27 @@ try {
     Assert-True ($statusIndex -lt $referencesIndex) "AGENTS.md does not route through status before optional references"
     $generatedReadme = Get-Content -LiteralPath (Join-Path $smokePath "README.md") -Raw -Encoding UTF8
     Assert-True ($generatedReadme.Contains("# Init Smoke Project")) "README.md did not render the project name"
-    Assert-True ($generatedReadme.Contains("项目简介 / Overview")) "README.md is missing the bilingual placeholder structure"
+    Assert-True ($generatedReadme.Contains("One-line description")) "README.md is missing the bilingual placeholder structure"
     Assert-True (-not $generatedReadme.Contains("AWZ")) "README.md exposes the initializer identity"
     Assert-True (-not $generatedReadme.Contains(".awz/")) "README.md exposes internal reference mapping"
+    $generatedReferences = Get-Content -LiteralPath (Join-Path $smokePath "docs/references/README.md") -Raw -Encoding UTF8
+    Assert-True ($generatedReferences.Contains("runtime / package manager")) "reference index is missing the development environment baseline"
+    Assert-True ($generatedReferences.Contains("guides/verification.md")) "reference index is missing the cold verification pointer"
+    $generatedVerification = Get-Content -LiteralPath (Join-Path $smokePath "docs/agent-room/guides/verification.md") -Raw -Encoding UTF8
+    Assert-True ($generatedVerification.Contains("executable/version")) "verification guide is missing shell environment details"
+    $generatedOnboarding = Get-Content -LiteralPath (Join-Path $smokePath "docs/agent-room/onboarding.md") -Raw -Encoding UTF8
+    Assert-True ($generatedOnboarding.Contains("Git/dirty state")) "onboarding is missing the probe-before-build route"
+    Assert-True ($generatedOnboarding.Contains("status") -and $generatedOnboarding.Contains("checklist")) "onboarding is missing mainline continuity rules"
+    $generatedStatus = Get-Content -LiteralPath (Join-Path $smokePath "docs/agent-room/status.md") -Raw -Encoding UTF8
+    Assert-True ($generatedStatus.Contains("Checklist")) "status is missing the primary checklist pointer"
+    Assert-True (-not $generatedStatus.Contains("- [ ]")) "status contains a competing embedded checklist"
+    foreach ($path in @("README.md", "LICENSE", "docs/agent-room/status.md")) {
+        Assert-SingleTrailingLineBreak (Join-Path $smokePath $path)
+    }
     $generatedCollaborationPath = Join-Path $smokePath "docs/agent-room/guides/collaboration.md"
     $generatedCollaboration = Get-Content -LiteralPath $generatedCollaborationPath -Raw -Encoding UTF8
-    foreach ($modeLabel in @("单 Agent", "双 Agent", "三 Agent", "四个及以上 Agent")) {
-        Assert-True ($generatedCollaboration.Contains($modeLabel)) "collaboration strategy is missing mode: $modeLabel"
+    foreach ($modeMarker in @("single / pair / triad / team", "Agent / model / harness", "Agent C", "Lead / coordinator")) {
+        Assert-True ($generatedCollaboration.Contains($modeMarker)) "collaboration strategy is missing mode marker: $modeMarker"
     }
 
     git -C $smokePath check-ignore -q -- ".env.example"

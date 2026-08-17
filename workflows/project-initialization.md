@@ -65,6 +65,8 @@ scripts\init-project.bat -TargetPath "E:\Project\Example" -ProjectName "Example"
 
 注意：`AGENTS.md` 和 `CLAUDE.md` 会生成在项目根目录，方便本地 Agent 读取，但默认不进 git。
 
+初始化只负责生成安全占位和本地规则，不替项目猜环境或业务事实。Agent 第一次进入真实构建时，按 `workflows/agent-onboarding.md` 执行“探测 → 必要沉淀 → 主 checklist → 实现”；环境事实写入 references，当前主线与 checklist 指针写入 status。
+
 `.awz/references.json` 只声明项目使用哪些 reference id，不保存本机参考库绝对路径。初始化器不会创建外部参考库、修改机器级配置、联网或 clone；参考库生命周期使用独立 `reference` 命令，详见 `workflows/reference-library.md`。
 
 初始化器只接受目录目标，且不允许把 AWZ Workflow 自身源码目录作为目标。需要新建 git 仓库时，必须在任何文件或目录写入前确认 `git` 可用；缺失时直接报错，不留下半成品基线。不能把“跳过同名文件”等同于“对已有项目安全”，因为新增 README、LICENSE、Agent 规则或目录同样会污染旧项目。

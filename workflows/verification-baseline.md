@@ -2,6 +2,15 @@
 
 本文件定义 Agent 在项目中如何选择检查命令。核心原则：先检测已有入口，再执行最小有效验证；不要为了验证而强行生成项目并不需要的配置文件。
 
+## 环境与文本语义
+
+首次构建、已有项目接入或环境变化时，先探测 OS/架构、实际 shell executable/version、编码与行尾、Git、runtime/package manager 和已验证入口；只把会影响后续执行的事实写入 `docs/references/README.md`。
+
+- 不把 PowerShell、cmd、Bash 的引号和转义互相照搬。PowerShell 的“反引号 + n”只在正确的可展开字符串中表示换行；单引号或额外转义层会把它写成字面量。
+- Windows PowerShell 5.1 与 PowerShell 7 不能只凭同名假定编码行为一致。
+- 多行文档优先使用结构化 edit/patch；必须经 shell 写入时，立即回读实际字符、编码与行尾。
+- 初始化器、生成器或批量写入应加入文件尾或字节级回归断言，不依赖肉眼检查。
+
 ## 三层验证
 
 ### DryRun

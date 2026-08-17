@@ -160,7 +160,7 @@ function Write-GeneratedFile {
 
     if ($Render) {
         $content = Get-TemplateContent $SourceName
-        Set-Content -LiteralPath $dest -Value $content -Encoding UTF8
+        Set-Content -LiteralPath $dest -Value $content -Encoding UTF8 -NoNewline
     }
     else {
         $source = Join-Path $templateRoot $SourceName
