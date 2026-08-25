@@ -19,9 +19,9 @@ Import-Module $tuiModule -Force -ErrorAction Stop
 
 function Show-Usage {
     @"
-AWZ Workflow Terminal Wizard
+AWZ Workflow Terminal Control Center
 
-Interactive terminal wizard:
+Interactive control center:
   .\scripts\awz.bat
   .\scripts\awz.ps1
 
@@ -32,7 +32,7 @@ Scriptable:
   .\scripts\awz.ps1 -Action init -TargetPath <path> [options]
 
 Options:
-  -Action init          Run project initialization.
+  -Action init          Run project initialization (scriptable compatibility path).
   -TargetPath <path>   Target project directory.
   -ProjectName <name>  Project name. Defaults to the target directory name.
   -Owner <name>        MIT license owner.
@@ -174,15 +174,21 @@ function Invoke-ScriptedFlow {
     }
 }
 
-function Invoke-TerminalWizard {
-    param([string]$InitializerPath)
+function Invoke-InitializationWizard {
+    param(
+        [string]$InitializerPath,
+        [string]$InitialMode = ""
+    )
 
     try {
-        $selectedMode = Select-AwzTuiOption -Title "选择工作模式" -Subtitle "新项目与已有项目采用完全不同的安全边界" -Step "01 [模式]  ───   02  信息   ───   03  预览   ───   04  执行" -Options @(
-            [pscustomobject]@{ Label = "创建新项目"; Description = "仅允许不存在或完全为空的目标目录"; Value = "New" },
-            [pscustomobject]@{ Label = "接入已有项目"; Description = "显式保留项目自有文件，只补充 AWZ 基线"; Value = "Existing" }
-        )
-        if (-not $selectedMode) { return }
+        $selectedMode = $InitialMode
+        if (-not $selectedMode) {
+            $selectedMode = Select-AwzTuiOption -Title "选择工作模式" -Subtitle "新项目与已有项目采用完全不同的安全边界" -Step "01 [模式]  ───   02  信息   ───   03  预览   ───   04  执行" -Options @(
+                [pscustomobject]@{ Label = "创建新项目"; Description = "仅允许不存在或完全为空的目标目录"; Value = "New" },
+                [pscustomobject]@{ Label = "接入已有项目"; Description = "显式保留项目自有文件，只补充 AWZ 基线"; Value = "Existing" }
+            )
+            if (-not $selectedMode) { return }
+        }
 
         $target = Read-AwzTuiText -Title "项目位置" -Label "目标目录" -Hint "示例：E:\Project\My App" -Step "01  模式   ───   02 [信息]  ───   03  预览   ───   04  执行" -Required
         if (-not $target) { return }
@@ -244,19 +250,222 @@ function Invoke-TerminalWizard {
     }
 }
 
+function Invoke-AwzJsonCommand {
+    param(
+        [string]$ScriptPath,
+        [string[]]$Arguments,
+        [int[]]$AcceptedExitCodes = @(0)
+    )
+
+    if (-not (Test-Path -LiteralPath $ScriptPath -PathType Leaf)) {
+        throw "AWZ command not found: $ScriptPath"
+    }
+    $commandArguments = @($Arguments) + @("--json")
+    $output = @(& $ScriptPath @commandArguments)
+    $exitCode = $LASTEXITCODE
+    $text = $output -join "`n"
+    if (-not $text.Trim()) {
+        throw "AWZ command returned no structured output: $ScriptPath"
+    }
+    try {
+        $result = $text | ConvertFrom-Json
+    }
+    catch {
+        throw "AWZ command returned invalid JSON: $($_.Exception.Message)"
+    }
+    if ($exitCode -notin $AcceptedExitCodes) {
+        $reason = @($result.blockedBy) -join "; "
+        if (-not $reason) { $reason = "exit code $exitCode" }
+        throw $reason
+    }
+    return $result
+}
+
+function Show-AwzReadOnlyPage {
+    param(
+        [string]$Title,
+        [string]$Subtitle,
+        [string[]]$Content,
+        [string]$Step = "HOME [控制中心]"
+    )
+
+    Show-AwzTuiFrame -Title $Title -Subtitle $Subtitle -Content $Content -Step $Step -Footer "按 B 返回控制中心；Q 退出"
+    while ($true) {
+        $choice = (Read-Host "输入 B 返回，Q 退出").Trim()
+        if ($choice -match '^[bB]$') { return "back" }
+        if ($choice -match '^[qQ]$') { return "exit" }
+    }
+}
+
+function Invoke-ReferenceBrowser {
+    param([string]$ReferenceCli)
+
+    try {
+        while ($true) {
+            $list = Invoke-AwzJsonCommand -ScriptPath $ReferenceCli -Arguments @("list")
+            $references = @($list.data.references)
+            if ($references.Count -eq 0) {
+                return Show-AwzReadOnlyPage -Title "Reference Library" -Subtitle "机器级参考项目库" -Content @(
+                    "Reference root   $($list.data.referenceRoot)",
+                    "状态             尚未登记 reference",
+                    "",
+                    "使用 Reference CLI add 或后续 TUI 写入流程登记项目。"
+                ) -Step "HOME  ───  [REFERENCE]  ───  DETAIL"
+            }
+
+            $options = @(
+                foreach ($reference in $references) {
+                    [pscustomobject]@{
+                        Label = [string]$reference.id
+                        Description = "$($reference.state.status)  ·  version $($reference.version)"
+                        Value = [string]$reference.id
+                    }
+                }
+            )
+            $healthyCount = @($references | Where-Object { $_.state.status -eq "ok" }).Count
+            $configSource = if ($list.data.configured) { "显式配置" } else { "默认路径" }
+            $selected = Select-AwzTuiOption -Title "Reference Library" -Subtitle "$($references.Count) 个条目 · 正常 $healthyCount · $configSource · $($list.data.referenceRoot)" -Step "HOME  ───  [REFERENCE]  ───  DETAIL" -Options $options -AllowBack
+            if (-not $selected) { return "exit" }
+            if ($selected -eq "__AWZ_BACK__") { return "back" }
+
+            $detail = Invoke-AwzJsonCommand -ScriptPath $ReferenceCli -Arguments @("show", "--id", $selected)
+            $reference = $detail.data.reference
+            $state = $reference.state
+            $issues = @($state.issues)
+            $content = @(
+                "ID        $($reference.id)",
+                "状态      $($state.status)",
+                "版本      $($reference.version)",
+                "分支      $($state.branch)",
+                "Revision  $($reference.revision)",
+                "License   $($reference.license)",
+                "Trust     $($reference.trust)",
+                "Path      $($state.path)",
+                "Remote    $($state.remote)",
+                "Issues    $($issues.Count)"
+            )
+            foreach ($issue in ($issues | Select-Object -First 3)) {
+                $content += "  ! $issue"
+            }
+            $pageResult = Show-AwzReadOnlyPage -Title "Reference 详情：$($reference.name)" -Subtitle "只读状态；不会 fetch、update 或修改 catalog" -Content $content -Step "HOME  ───  REFERENCE  ───  [DETAIL]"
+            if ($pageResult -eq "exit") { return "exit" }
+        }
+    }
+    catch {
+        return Show-AwzReadOnlyPage -Title "Reference Library 不可用" -Subtitle "只读命令返回错误" -Content @(
+            "✕ $($_.Exception.Message)",
+            "",
+            "没有执行任何 Reference Library 写操作。"
+        ) -Step "HOME  ───  [REFERENCE ERROR]"
+    }
+}
+
+function Invoke-ReferenceDoctor {
+    param([string]$ReferenceCli)
+
+    try {
+        $doctor = Invoke-AwzJsonCommand -ScriptPath $ReferenceCli -Arguments @("doctor") -AcceptedExitCodes @(0, 1)
+        $references = @($doctor.data.references)
+        $problemReferences = @($references | Where-Object { $_.status -ne "ok" })
+        $content = [System.Collections.Generic.List[string]]::new()
+        $content.Add("配置      $($doctor.data.configured)")
+        $content.Add("Root      $($doctor.data.referenceRoot)")
+        $content.Add("Root 存在 $($doctor.data.rootExists)")
+        $content.Add("Reference $($references.Count) · 问题 $($problemReferences.Count)")
+        $content.Add("")
+        foreach ($reference in ($references | Select-Object -First 3)) {
+            $marker = if ($reference.status -eq "ok") { "✓" } else { "!" }
+            $content.Add("$marker $($reference.id)  $($reference.status)")
+            foreach ($issue in (@($reference.issues) | Select-Object -First 1)) {
+                $content.Add("    $issue")
+            }
+        }
+        foreach ($warning in (@($doctor.warnings) | Select-Object -First 1)) {
+            $content.Add("WARN  $warning")
+        }
+        foreach ($blocker in (@($doctor.blockedBy) | Select-Object -First 1)) {
+            $content.Add("BLOCK $blocker")
+        }
+        if ($problemReferences.Count -gt 0) {
+            $content.Add("建议：检查上方问题后重新运行 Doctor；本页不会自动修复。")
+        }
+        $subtitle = if ($doctor.exitCode -eq 0) { "离线检查通过" } else { "发现需要处理的问题；本页不会自动修复" }
+        return Show-AwzReadOnlyPage -Title "AWZ Doctor" -Subtitle $subtitle -Content $content.ToArray() -Step "HOME  ───  [DOCTOR]"
+    }
+    catch {
+        return Show-AwzReadOnlyPage -Title "AWZ Doctor 不可用" -Subtitle "诊断命令返回错误" -Content @("✕ $($_.Exception.Message)") -Step "HOME  ───  [DOCTOR ERROR]"
+    }
+}
+
+function Invoke-RefreshCheck {
+    param([string]$RefreshCli)
+
+    $target = Read-AwzTuiText -Title "安全刷新检查" -Label "项目目录" -Hint "只运行 DryRun，不会修改项目" -Step "HOME  ───  [REFRESH CHECK]" -Required -AllowBack -ExitOnQuit
+    if ($target -eq "__AWZ_BACK__") { return "back" }
+    if ($target -eq "__AWZ_EXIT__") { return "exit" }
+    try {
+        $refresh = Invoke-AwzJsonCommand -ScriptPath $RefreshCli -Arguments @("--target", $target, "--dry-run") -AcceptedExitCodes @(0, 2)
+        $files = @($refresh.data.files)
+        $updates = @($files | Where-Object { $_.classification -in @("create", "update") })
+        $adopted = @($files | Where-Object { $_.classification -eq "adopt" })
+        $conflicts = @($files | Where-Object { $_.classification -eq "conflict" })
+        $content = [System.Collections.Generic.List[string]]::new()
+        $content.Add("目标      $target")
+        $content.Add("待更新    $($updates.Count)")
+        $content.Add("首次接管  $($adopted.Count)")
+        $content.Add("冲突      $($conflicts.Count)")
+        $content.Add("Plan      $($refresh.plan.planHash)")
+        $content.Add("")
+        foreach ($item in ($files | Where-Object { $_.classification -ne "unchanged" } | Select-Object -First 5)) {
+            $content.Add("$($item.classification.ToUpper())  $($item.path)")
+        }
+        $subtitle = if ($conflicts.Count -gt 0) { "发现本地冲突；refresh 已整体阻止" } else { "DryRun 完成；本页不会 apply" }
+        return Show-AwzReadOnlyPage -Title "安全刷新检查" -Subtitle $subtitle -Content $content.ToArray() -Step "HOME  ───  [REFRESH CHECK]"
+    }
+    catch {
+        return Show-AwzReadOnlyPage -Title "安全刷新检查失败" -Subtitle "没有修改目标项目" -Content @("✕ $($_.Exception.Message)") -Step "HOME  ───  [REFRESH ERROR]"
+    }
+}
+
+function Invoke-TerminalWizard {
+    param(
+        [string]$InitializerPath,
+        [string]$ReferenceCli,
+        [string]$RefreshCli
+    )
+
+    while ($true) {
+        $selected = Select-AwzTuiOption -Title "AWZ 控制中心" -Subtitle "项目初始化、参考库、刷新检查与离线诊断" -Step "HOME [控制中心]" -Compact -Options @(
+            [pscustomobject]@{ Label = "创建新项目"; Description = "安全初始化空目录"; Value = "New" },
+            [pscustomobject]@{ Label = "接入已有项目"; Description = "保留项目自有文件"; Value = "Existing" },
+            [pscustomobject]@{ Label = "Reference Library"; Description = "浏览参考条目与本地状态"; Value = "Reference" },
+            [pscustomobject]@{ Label = "安全刷新检查"; Description = "manifest DryRun，不执行写入"; Value = "Refresh" },
+            [pscustomobject]@{ Label = "Doctor"; Description = "离线诊断配置与 reference"; Value = "Doctor" }
+        )
+        if (-not $selected) { return }
+        switch ($selected) {
+            "New" { Invoke-InitializationWizard -InitializerPath $InitializerPath -InitialMode "New" }
+            "Existing" { Invoke-InitializationWizard -InitializerPath $InitializerPath -InitialMode "Existing" }
+            "Reference" { if ((Invoke-ReferenceBrowser -ReferenceCli $ReferenceCli) -eq "exit") { return } }
+            "Refresh" { if ((Invoke-RefreshCheck -RefreshCli $RefreshCli) -eq "exit") { return } }
+            "Doctor" { if ((Invoke-ReferenceDoctor -ReferenceCli $ReferenceCli) -eq "exit") { return } }
+        }
+    }
+}
+
 if ($Help -or $Action -in @("--help", "-h", "help")) {
     Show-Usage
     return
 }
 
 if ($RenderDemo) {
-    New-AwzTuiFrame -Title "选择工作模式" -Subtitle "新项目与已有项目采用完全不同的安全边界" -Content @(
-        "[1]  创建新项目",
-        "     仅允许不存在或完全为空的目标目录",
-        "",
-        "[2]  接入已有项目",
-        "     显式保留项目自有文件，只补充 AWZ 基线"
-    ) -Step "01 [模式]  ───   02  信息   ───   03  预览   ───   04  执行" -Footer "在面板下方输入编号；Q 退出" -Width 92
+    New-AwzTuiFrame -Title "AWZ 控制中心" -Subtitle "项目初始化、参考库、刷新检查与离线诊断" -Content @(
+        "[1]  创建新项目  ·  安全初始化空目录",
+        "[2]  接入已有项目  ·  保留项目自有文件",
+        "[3]  Reference Library  ·  浏览参考条目与本地状态",
+        "[4]  安全刷新检查  ·  manifest DryRun，不执行写入",
+        "[5]  Doctor  ·  离线诊断配置与 reference"
+    ) -Step "HOME [控制中心]" -Footer "在面板下方输入编号；Q 退出" -Width 92
     return
 }
 
@@ -264,10 +473,12 @@ $initializer = Join-Path $PSScriptRoot "init-project.ps1"
 if (-not (Test-Path -LiteralPath $initializer -PathType Leaf)) {
     throw "Initializer not found: $initializer"
 }
+$referenceCli = Join-Path $PSScriptRoot "reference-library.ps1"
+$refreshCli = Join-Path $PSScriptRoot "refresh-project.ps1"
 
 $useTerminalWizard = (-not $Action) -and (-not $Classic) -and (-not [Console]::IsInputRedirected)
 if ($useTerminalWizard) {
-    Invoke-TerminalWizard -InitializerPath $initializer
+    Invoke-TerminalWizard -InitializerPath $initializer -ReferenceCli $referenceCli -RefreshCli $refreshCli
     return
 }
 

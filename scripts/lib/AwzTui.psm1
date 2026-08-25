@@ -154,26 +154,71 @@ function Select-AwzTuiOption {
         [string]$Title,
         [string]$Subtitle,
         [object[]]$Options,
-        [string]$Step
+        [string]$Step,
+        [switch]$Compact,
+        [switch]$AllowBack
     )
 
+    $errorMessage = ""
+    $pageSize = if ($Compact) { 10 } else { 4 }
+    $page = 0
+    $pageCount = [Math]::Max(1, [Math]::Ceiling($Options.Count / $pageSize))
     while ($true) {
         $content = [System.Collections.Generic.List[string]]::new()
-        for ($i = 0; $i -lt $Options.Count; $i++) {
-            $content.Add("[$($i + 1)]  $($Options[$i].Label)")
-            $content.Add("     $($Options[$i].Description)")
-            $content.Add("")
+        $start = $page * $pageSize
+        $end = [Math]::Min($Options.Count, $start + $pageSize)
+        for ($i = $start; $i -lt $end; $i++) {
+            if ($Compact) {
+                $content.Add("[$($i + 1)]  $($Options[$i].Label)  ·  $($Options[$i].Description)")
+            }
+            else {
+                $content.Add("[$($i + 1)]  $($Options[$i].Label)")
+                $content.Add("     $($Options[$i].Description)")
+                $content.Add("")
+            }
         }
-        Show-AwzTuiFrame -Title $Title -Subtitle $Subtitle -Content $content.ToArray() -Step $Step -Footer "在面板下方输入编号；Q 退出"
+        if ($errorMessage) {
+            $content.Add("")
+            $content.Add("! $errorMessage")
+        }
+        if ($pageCount -gt 1) {
+            $content.Add("")
+            $content.Add("第 $($page + 1) / $pageCount 页")
+        }
+        $footerParts = [System.Collections.Generic.List[string]]::new()
+        $footerParts.Add("输入编号")
+        if ($pageCount -gt 1) { $footerParts.Add("N/P 翻页") }
+        if ($AllowBack) { $footerParts.Add("B 返回") }
+        $footerParts.Add("Q 退出")
+        $footer = $footerParts -join "；"
+        Show-AwzTuiFrame -Title $Title -Subtitle $Subtitle -Content $content.ToArray() -Step $Step -Footer $footer
 
-        $choice = (Read-Host "选择 [1-$($Options.Count)] 或 Q").Trim()
+        $prompt = "选择 [$($start + 1)-$end]"
+        if ($pageCount -gt 1) { $prompt += "、N/P" }
+        if ($AllowBack) { $prompt += "、B" }
+        $prompt += " 或 Q"
+        $choice = (Read-Host $prompt).Trim()
         if ($choice -match '^[qQ]$') {
             return $null
         }
+        if ($AllowBack -and $choice -match '^[bB]$') {
+            return "__AWZ_BACK__"
+        }
+        if ($pageCount -gt 1 -and $choice -match '^[nN]$') {
+            $page = ($page + 1) % $pageCount
+            $errorMessage = ""
+            continue
+        }
+        if ($pageCount -gt 1 -and $choice -match '^[pP]$') {
+            $page = if ($page -le 0) { $pageCount - 1 } else { $page - 1 }
+            $errorMessage = ""
+            continue
+        }
         $number = 0
-        if ([int]::TryParse($choice, [ref]$number) -and $number -ge 1 -and $number -le $Options.Count) {
+        if ([int]::TryParse($choice, [ref]$number) -and $number -ge ($start + 1) -and $number -le $end) {
             return $Options[$number - 1].Value
         }
+        $errorMessage = '无法识别输入“{0}”，请使用页面显示的编号。' -f $choice
     }
 }
 
@@ -184,7 +229,9 @@ function Read-AwzTuiText {
         [string]$Value = "",
         [string]$Hint = "",
         [string]$Step,
-        [switch]$Required
+        [switch]$Required,
+        [switch]$AllowBack,
+        [switch]$ExitOnQuit
     )
 
     while ($true) {
@@ -198,11 +245,16 @@ function Read-AwzTuiText {
             "",
             $Hint
         )
-        Show-AwzTuiFrame -Title $Title -Subtitle "稳定输入模式：不逐键重绘终端" -Content $content -Step $Step -Footer "在面板下方输入；输入 Q 取消"
+        $footer = if ($AllowBack) { "在面板下方输入；B 返回；Q 退出" } else { "在面板下方输入；输入 Q 取消" }
+        Show-AwzTuiFrame -Title $Title -Subtitle "稳定输入模式：不逐键重绘终端" -Content $content -Step $Step -Footer $footer
 
         $input = Read-Host $Label
         if ($input -ceq "Q") {
+            if ($ExitOnQuit) { return "__AWZ_EXIT__" }
             return $null
+        }
+        if ($AllowBack -and $input -ceq "B") {
+            return "__AWZ_BACK__"
         }
         if ($input) {
             return $input

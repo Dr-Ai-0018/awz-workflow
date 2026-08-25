@@ -18,6 +18,7 @@
 - Reference Library transaction 与 JSON apply contract 的无网络隔离测试。
 - 基于本地 manifest 的独立项目 `refresh`：逐文件 ownership/hash 分类、stale plan 拒绝、冲突整体阻止和覆盖前备份。
 - Windows/POSIX refresh 包装器、隔离 fixture 与跨平台 smoke。
+- Windows/POSIX AWZ 控制中心主菜单，以及结构化 Reference 列表/详情、只读 Doctor 和 refresh DryRun 页面。
 - 初始化项目新增统一的 `docs/references/` 背景与资料入口，Reference Library context 同目录生成。
 - Agent 协作规则支持单 Agent、双 Agent、三 Agent 与四个以上团队按实际 model/harness 能力动态选择策略。
 - 以语义边界触发的阶段收口与恢复链，不依赖 token 阈值或 Harness compaction。
@@ -43,6 +44,7 @@
 - 新人恢复链改为先读 status 再按指针挂载 references、review、plan 和专题规则；文件搜索拆为独立按需 guide。
 - PowerShell 与 POSIX 初始化器统一为 `New`/`Existing` 双模式，并在首次写入前校验完整模板集。
 - Windows TUI 收敛为编号选择与原生单行输入的分步终端向导，保留 DryRun、危险确认、完整日志和完成/错误页面。
+- 原初始化向导升级为统一控制中心；Reference 写入生命周期仍保留在 CLI，控制中心当前只开放不会修改全局库或项目的读取与检查能力。
 - status 与 handoff 模板补充验证事实、当前有效状态、Git 状态和恢复入口。
 
 ## [0.2.0] - 2026-07-12

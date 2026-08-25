@@ -1,6 +1,6 @@
 # TUI 与 CLI 工作流
 
-本文件定义 AWZ Workflow 的终端交互入口。TUI 是初始化器之上的轻量编排层，不拥有文件生成或覆盖权限。
+本文件定义 AWZ Workflow 的终端交互入口。TUI 是初始化器、Reference Library 和安全 refresh 核心之上的轻量编排层，不直接拥有业务数据写入或文件覆盖权限。
 
 ## 入口
 
@@ -28,13 +28,26 @@ bash scripts/awz.sh
 
 POSIX TUI 应在 Ubuntu、Linux 或 Windows Terminal 的 WSL profile 内运行。从 Windows PowerShell 跨宿主直接调用 `bash scripts/awz.sh` 时，`wsl.exe` 的输出转码可能让中文显示为乱码；Windows 会话应使用 `awz.bat` / `awz.ps1`，这不影响 POSIX 脚本在 UTF-8 终端中的行为。
 
-`awz.bat` 只选择 `pwsh` 或 Windows PowerShell，并把参数转交给 `awz.ps1`。`awz.ps1` 与 `awz.sh` 负责交互；真实初始化仍分别由 `init-project.ps1` 与 `init-project.sh` 完成。
+`awz.bat` 只选择 `pwsh` 或 Windows PowerShell，并把参数转交给 `awz.ps1`。`awz.ps1` 与 `awz.sh` 负责交互；真实初始化、Reference 数据读取和 refresh 扫描仍分别由对应底层脚本完成。
 
 Windows 的阶段面板、中文宽度计算、编号选择与预览呈现集中在 `scripts/lib/AwzTui.psm1`；`awz.ps1` 只保留流程编排与底层初始化器调用，避免继续膨胀成单文件应用。
 
-## Windows 终端向导
+## 控制中心
 
-`awz.bat` 默认用 `-NoProfile` 启动 PowerShell，`awz.ps1` 在真实终端中默认进入分步终端向导。它提供：
+Windows 与 POSIX 默认主菜单语义一致：
+
+1. `创建新项目`：进入 New 初始化子流程；
+2. `接入已有项目`：进入 Existing 初始化子流程；
+3. `Reference Library`：读取结构化 JSON，展示条目列表、详情和本地 repo 状态；
+4. `安全刷新检查`：要求项目路径，只运行 `refresh --dry-run --json`；
+5. `Doctor`：展示 reference root、配置来源、条目状态和离线问题；
+6. `Q`：退出控制中心；子页面使用 `B` 返回。
+
+当前控制中心的 Reference 与 Doctor 页面只读，refresh 页面不会提供 apply。配置、add、map/unmap、context、update、trash/restore/purge 等写操作必须等结构化预览、分级确认和恢复界面完成后再接入；在此之前继续使用 CLI，不得把少量只读页面称为完整 Reference 生命周期 TUI。
+
+## Windows 初始化子流程
+
+`awz.bat` 默认用 `-NoProfile` 启动 PowerShell；从控制中心选择 New 或 Existing 后进入分步初始化子流程。它提供：
 
 1. 编号选择新项目或已有项目模式；
 2. 分步输入目标目录、项目名和 License owner；输入阶段使用 PowerShell 原生单行编辑，支持粘贴路径；
@@ -58,7 +71,7 @@ Windows 的阶段面板、中文宽度计算、编号选择与预览呈现集中
 .\scripts\awz.ps1 -RenderDemo
 ```
 
-POSIX `awz.sh` 当前保留引导式交互与相同安全语义；后续只对齐分步信息层级、预览和结果呈现，不在两种 shell 中复制底层初始化逻辑，也不把逐键全屏重绘作为目标。
+POSIX `awz.sh` 已对齐五项主菜单、Reference 列表/详情、Doctor 与 refresh DryRun 语义；初始化仍使用行式引导，不在两种 shell 中复制底层业务逻辑，也不把逐键全屏重绘作为目标。
 
 ## 安全不变量
 
@@ -66,6 +79,8 @@ POSIX `awz.sh` 当前保留引导式交互与相同安全语义；后续只对�
 - `-Yes` / `--yes` 只能跳过人工确认，不能跳过 DryRun。
 - DryRun 失败时不能进入执行阶段。
 - TUI 不直接复制模板、创建目录或运行 `git init`。
+- TUI 不直接读取或拼接 catalog 文件；只消费 Reference Library 的结构化 JSON。
+- Reference 与 Doctor 页面不得写配置、catalog、mapping 或 repo；refresh 检查不得 apply 或生成 manifest。
 - Existing 模式仍永久保护项目自有的 `.gitignore`、`.env.example`、`README.md` 和 `LICENSE`。
 - 登录、密钥、环境变量或技术栈配置不在 v1 TUI 中自动推断或写入。
 
@@ -125,16 +140,18 @@ bash scripts/smoke-awz-tui.sh
 - 默认模式拒绝非空目标；
 - 被拒绝目标不出现新增模板文件；
 - Windows BAT 参数转发可用；
-- 终端向导 frame 包含完整边框、步骤栏、编号选择与明确的输入提示；
+- Windows 控制中心 frame 包含五项入口、完整边框、步骤栏、编号选择与明确输入提示；
+- 两端使用隔离配置验证 Reference list、Doctor 和 refresh DryRun，且不接触真实 Reference Library、不生成 refresh manifest；
 - 测试结束后没有临时残留。
 
 ## 后续演进
 
-TUI 后续按独立 action/subcommand 扩展：
+TUI 后续按独立、可恢复的 lifecycle 扩展：
 
-1. `doctor`：检查 Git、PowerShell/Bash、uv、pnpm 等环境能力，只报告不安装。
-2. `refresh`：安全核心与 Windows/POSIX 脚本入口已具备；下一步接入主菜单，基于 manifest hash 展示 AWZ 管理文件分类，再选择 apply。
-3. `plan --json`：输出机器可读变更计划，供更完整的终端向导或其他前端消费。
-4. 技术栈初始化：仅在用户明确选择 Python/Node 等类型后调用独立脚手架，不并入通用 init。
+1. 配置、add、map/unmap 与 context：先预览结构化计划，再显式 apply；
+2. edit、rename、check-update 与 fast-forward update：保留 dirty repo 和 stale-plan 阻止；
+3. unregister、trash、restore 与最后才开放的 purge：事务、恢复和目标校验必须先齐全；
+4. 环境 Doctor：检查 Git、PowerShell/Bash、uv、pnpm 等能力，只报告不安装；
+5. 技术栈初始化：仅在用户明确选择 Python/Node 等类型后调用独立脚手架，不并入通用 init。
 
 新增 action 不能扩大 `init` 权限，也不能通过交互层绕开底层脚本的安全边界。

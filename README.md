@@ -171,7 +171,7 @@ apply 必须携带上一轮 DryRun 的 `planHash`；源模板、目标文件或 
 
 ## 终端交互入口
 
-Windows 推荐直接运行 BAT。它会使用 `-NoProfile` 启动 PowerShell，并进入分步终端向导：
+Windows 推荐直接运行 BAT。它会使用 `-NoProfile` 启动 PowerShell，并进入 AWZ 控制中心：
 
 ```powershell
 .\scripts\awz.bat
@@ -196,7 +196,9 @@ Ubuntu/POSIX：
 bash scripts/awz.sh
 ```
 
-Windows 终端向导使用稳定的分步面板、编号选择、原生单行输入、完整 DryRun 预览、危险操作确认以及完成/错误页面。输入和预览交给终端原生编辑、粘贴与滚动，避免逐键重绘在 Windows Terminal/ConPTY 下造成残影或错位。自动化环境也可以传入完整参数和 `-Yes` / `--yes`，但不能跳过预览与底层安全检查。详细契约见 [TUI 与 CLI 工作流](workflows/tui.md)。
+Windows 与 POSIX 主菜单统一提供：创建新项目、接入已有项目、Reference Library、安全刷新检查和 Doctor。当前 Reference Library 支持结构化只读列表、详情和本地仓库状态；Doctor 只报告配置与离线问题；安全刷新检查只运行 manifest DryRun，绝不从控制中心 apply。初始化子流程继续使用编号选择、原生单行输入、完整 DryRun、危险确认和结果页面，避免逐键重绘在 Windows Terminal/ConPTY 下造成残影或错位。
+
+Reference 配置、登记、映射、更新、trash/restore 等写入生命周期尚未接入控制中心；CLI 仍是这些能力的稳定内核与测试入口。自动化环境可以传入完整 init 参数和 `-Yes` / `--yes`，但不能跳过预览与底层安全检查。详细契约见 [TUI 与 CLI 工作流](workflows/tui.md)。
 
 ## 硬边界
 
