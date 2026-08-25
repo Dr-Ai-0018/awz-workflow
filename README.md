@@ -145,6 +145,8 @@ Reference Library 把 GSAP 这类长期参考源码放在业务项目之外，�
 
 初始化器只生成空 mapping 和 `docs/references/README.md` 背景/资料入口，不联网、不 clone。`context` 默认把本机解析结果写入同目录的 `reference-context.md`；真实第三方源码始终位于业务项目之外。参考库的 configure、add、map、context 和 doctor 使用独立命令，详见 [参考项目库工作流](workflows/reference-library.md)。
 
+Reference Library 的写操作会在机器级 reference root 的 `logs/transactions/` 留下脱敏 transaction 记录，包含计划 hash、已完成/未完成 action、终态和失败恢复步骤。它用于审计与恢复，不保存 credential-bearing URL、token 或 cookie。
+
 ## 终端交互入口
 
 Windows 推荐直接运行 BAT。它会使用 `-NoProfile` 启动 PowerShell，并进入分步终端向导：

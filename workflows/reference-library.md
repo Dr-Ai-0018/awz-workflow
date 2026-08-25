@@ -129,6 +129,14 @@ Agent 必须先读当前项目，再按任务命中情况读取 reference。默�
 - license 缺失必须显示为 `unknown`，不能当作可自由复制。
 - reference repos、机器配置、context cache 和 logs 不进入业务项目或 AWZ release 包。
 
+### Transaction 与失败恢复
+
+- `configure`、`add`、`map`、`unmap` 和 `context` 的真实写入会在 `<referenceRoot>/logs/transactions/` 创建 transaction JSON。
+- transaction 状态按 `planned → applying → completed/failed` 流转，并记录 `planHash`、actions、completed、remaining、recovery 和脱敏错误。
+- JSON apply 成功时在 `data.transaction` 返回 transaction 摘要；失败时使用 `blockedBy`、`recovery` 和可用的 transaction 摘要说明阻塞与恢复入口。
+- 文本 CLI 失败时也必须打印 transaction 路径和 recovery，不让用户只能从半成品猜测发生了什么。
+- transaction 不得记录 credential-bearing URL、token、cookie、password、secret 或 API key；日志自身也不进入业务项目或 release 包。
+
 ## 验证
 
 变更 reference 功能后至少运行：
@@ -144,3 +152,9 @@ bash scripts/smoke-init-project.sh
 ```
 
 smoke 使用隔离配置目录和本地 Git fixture，不依赖公网，也不能修改真实参考库。
+
+模块级离线测试：
+
+```powershell
+python -m unittest discover -s scripts/tests -v
+```

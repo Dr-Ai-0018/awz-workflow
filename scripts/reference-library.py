@@ -15,7 +15,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, NoReturn, Optional
 
 from reference_library.catalog import (
     catalog_path,
@@ -45,6 +45,7 @@ from reference_library.projects import (
     resolve_context_output,
 )
 from reference_library.storage import write_json_atomic, write_text_atomic
+from reference_library.transactions import ReferenceTransaction
 
 
 def write_stderr(message: str) -> None:
@@ -86,6 +87,39 @@ def validate_apply_plan(args: argparse.Namespace, plan: Dict[str, Any]) -> None:
     require_matching_plan(plan, args.plan_hash)
 
 
+def start_transaction(root: Path, operation: str, plan: Dict[str, Any]) -> ReferenceTransaction:
+    try:
+        return ReferenceTransaction(root, operation, plan)
+    except Exception as exc:
+        raise ReferenceLibraryError(f"Unable to create Reference Library transaction record: {exc}") from exc
+
+
+def transaction_data(
+    data: Optional[Dict[str, Any]], transaction: ReferenceTransaction
+) -> Dict[str, Any]:
+    return {**(data or {}), "transaction": transaction.summary()}
+
+
+def raise_transaction_failure(
+    transaction: ReferenceTransaction,
+    error: BaseException,
+    recovery: Iterable[str],
+) -> NoReturn:
+    recovery_steps = [str(item) for item in recovery]
+    try:
+        transaction.fail(error, recovery_steps)
+    except Exception as transaction_error:
+        raise ReferenceLibraryError(
+            f"{error}; transaction record update also failed: {transaction_error}",
+            recovery=recovery_steps,
+        ) from error
+    raise ReferenceLibraryError(
+        str(error),
+        recovery=recovery_steps,
+        transaction=transaction.summary(),
+    ) from error
+
+
 def command_configure(args: argparse.Namespace) -> int:
     root = library_root({"referenceRoot": args.root})
     path = config_path()
@@ -108,8 +142,8 @@ def command_configure(args: argparse.Namespace) -> int:
     plan = write_plan(
         "reference.configure",
         [
-            {"kind": "write-json", "target": str(path), "summary": "写入机器级 Reference Library 配置"},
             {"kind": "ensure-layout", "target": str(root), "summary": "创建或验证 Reference Library 目录结构"},
+            {"kind": "write-json", "target": str(path), "summary": "写入机器级 Reference Library 配置"},
         ],
         [path, root],
         {"root": str(root), "depth": args.depth},
@@ -122,12 +156,35 @@ def command_configure(args: argparse.Namespace) -> int:
         print("DryRun: would not clone or update repositories.")
         return 0
     validate_apply_plan(args, plan)
-    ensure_library_layout(root)
-    write_json_atomic(path, data)
-    if emit_json_result(args, "reference.configure", 0, dry_run=False, plan=plan, data={"config": data}):
+    transaction = start_transaction(root, "reference.configure", plan)
+    try:
+        transaction.begin_apply()
+        ensure_library_layout(root)
+        transaction.complete_action(0)
+        write_json_atomic(path, data)
+        transaction.complete_action(1)
+        transaction.complete()
+    except Exception as exc:
+        raise_transaction_failure(
+            transaction,
+            exc,
+            [
+                f"Review the transaction record at {transaction.path}.",
+                "Re-run configure --dry-run before retrying the operation.",
+            ],
+        )
+    if emit_json_result(
+        args,
+        "reference.configure",
+        0,
+        dry_run=False,
+        plan=plan,
+        data=transaction_data({"config": data}, transaction),
+    ):
         return 0
     print(f"Configured Reference Library: {root}")
     print(f"Config: {path}")
+    print(f"Transaction: {transaction.path}")
     return 0
 
 
@@ -188,6 +245,7 @@ def command_add(args: argparse.Namespace) -> int:
     plan = write_plan(
         "reference.add",
         [
+            {"kind": "ensure-layout", "target": str(root), "summary": "创建或验证 Reference Library 目录结构"},
             {"kind": "git-clone", "target": str(destination), "summary": "clone 公开参考仓库，不执行其代码或 submodule"},
             {"kind": "write-json", "target": str(metadata_path), "summary": "写入 reference catalog"},
         ],
@@ -214,17 +272,21 @@ def command_add(args: argparse.Namespace) -> int:
     validate_apply_plan(args, plan)
     if not args.json_output:
         print(f"Reference root: {root} ({'configured' if configured else 'default'})")
-    ensure_library_layout(root)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    clone_arguments: List[str] = []
-    if local_safe_directory:
-        clone_arguments.extend(["-c", f"safe.directory={local_safe_directory}"])
-    clone_arguments.append("clone")
-    if not local_bundle:
-        clone_arguments.extend(["--depth", str(args.depth)])
-    clone_arguments.extend(["--no-recurse-submodules", clone_source, str(destination)])
-    run_git(clone_arguments)
+    transaction = start_transaction(root, "reference.add", plan)
     try:
+        transaction.begin_apply()
+        ensure_library_layout(root)
+        transaction.complete_action(0)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        clone_arguments: List[str] = []
+        if local_safe_directory:
+            clone_arguments.extend(["-c", f"safe.directory={local_safe_directory}"])
+        clone_arguments.append("clone")
+        if not local_bundle:
+            clone_arguments.extend(["--depth", str(args.depth)])
+        clone_arguments.extend(["--no-recurse-submodules", clone_source, str(destination)])
+        run_git(clone_arguments)
+        transaction.complete_action(1)
         if args.canonical_url:
             run_git(["remote", "set-url", "origin", stored_url], cwd=destination)
         head = run_git(["rev-parse", "HEAD"], cwd=destination).stdout.strip()
@@ -253,10 +315,22 @@ def command_add(args: argparse.Namespace) -> int:
             "updatedAt": timestamp,
         }
         write_json_atomic(metadata_path, metadata)
+        transaction.complete_action(2)
+        transaction.complete()
     except Exception as exc:
-        raise ReferenceLibraryError(
-            f"Repository clone was preserved at {destination}, but catalog creation failed: {exc}"
-        ) from exc
+        clone_preserved = destination.exists()
+        message = (
+            ReferenceLibraryError(f"Repository clone was preserved at {destination}, but the add operation failed: {exc}")
+            if clone_preserved
+            else exc
+        )
+        recovery = [
+            f"Review the transaction record at {transaction.path}.",
+            "Re-run add --dry-run before retrying the operation.",
+        ]
+        if clone_preserved:
+            recovery.insert(1, f"Inspect the preserved repository at {destination}; do not delete it automatically.")
+        raise_transaction_failure(transaction, message, recovery)
 
     if emit_json_result(
         args,
@@ -264,12 +338,16 @@ def command_add(args: argparse.Namespace) -> int:
         0,
         dry_run=False,
         plan=plan,
-        data={"id": reference_id, "destination": str(destination), "revision": head},
+        data=transaction_data(
+            {"id": reference_id, "destination": str(destination), "revision": head},
+            transaction,
+        ),
     ):
         return 0
     print(f"Added reference {reference_id}: {destination}")
     print(f"Revision: {head}")
     print(f"Catalog: {metadata_path}")
+    print(f"Transaction: {transaction.path}")
     return 0
 
 
@@ -311,7 +389,8 @@ def command_map(args: argparse.Namespace) -> int:
     reference_id = validate_reference_id(args.id)
     project = require_project(args.project)
     config, _, _ = load_config()
-    catalogs = load_catalogs(library_root(config))
+    root = library_root(config)
+    catalogs = load_catalogs(root)
     if reference_id not in catalogs:
         raise ReferenceLibraryError(f"Reference id is not registered: {reference_id}")
     mapping = load_project_mapping(project, allow_missing=True)
@@ -342,16 +421,40 @@ def command_map(args: argparse.Namespace) -> int:
         print(f"DryRun: would map {reference_id} in {path}")
         return 0
     validate_apply_plan(args, plan)
-    write_json_atomic(path, mapping)
-    if emit_json_result(args, "reference.map", 0, dry_run=False, plan=plan, data={"mapping": mapping}):
+    transaction = start_transaction(root, "reference.map", plan)
+    try:
+        transaction.begin_apply()
+        write_json_atomic(path, mapping)
+        transaction.complete_action(0)
+        transaction.complete()
+    except Exception as exc:
+        raise_transaction_failure(
+            transaction,
+            exc,
+            [
+                f"Review the transaction record at {transaction.path}.",
+                f"Inspect the project mapping at {path} before retrying.",
+            ],
+        )
+    if emit_json_result(
+        args,
+        "reference.map",
+        0,
+        dry_run=False,
+        plan=plan,
+        data=transaction_data({"mapping": mapping}, transaction),
+    ):
         return 0
     print(f"Mapped {reference_id}: {path}")
+    print(f"Transaction: {transaction.path}")
     return 0
 
 
 def command_unmap(args: argparse.Namespace) -> int:
     reference_id = validate_reference_id(args.id)
     project = require_project(args.project)
+    config, _, _ = load_config()
+    root = library_root(config)
     mapping = load_project_mapping(project)
     original = len(mapping["references"])
     mapping["references"] = [
@@ -372,10 +475,32 @@ def command_unmap(args: argparse.Namespace) -> int:
         print(f"DryRun: would unmap {reference_id} from {path}")
         return 0
     validate_apply_plan(args, plan)
-    write_json_atomic(path, mapping)
-    if emit_json_result(args, "reference.unmap", 0, dry_run=False, plan=plan, data={"mapping": mapping}):
+    transaction = start_transaction(root, "reference.unmap", plan)
+    try:
+        transaction.begin_apply()
+        write_json_atomic(path, mapping)
+        transaction.complete_action(0)
+        transaction.complete()
+    except Exception as exc:
+        raise_transaction_failure(
+            transaction,
+            exc,
+            [
+                f"Review the transaction record at {transaction.path}.",
+                f"Inspect the project mapping at {path} before retrying.",
+            ],
+        )
+    if emit_json_result(
+        args,
+        "reference.unmap",
+        0,
+        dry_run=False,
+        plan=plan,
+        data=transaction_data({"mapping": mapping}, transaction),
+    ):
         return 0
     print(f"Unmapped {reference_id}; global clone was preserved.")
+    print(f"Transaction: {transaction.path}")
     return 0
 
 
@@ -405,10 +530,32 @@ def command_context(args: argparse.Namespace) -> int:
         print(content)
         return exit_code
     validate_apply_plan(args, plan)
-    write_text_atomic(output, content)
-    if emit_json_result(args, "reference.context", exit_code, dry_run=False, plan=plan, data={"output": str(output)}):
+    transaction = start_transaction(root, "reference.context", plan)
+    try:
+        transaction.begin_apply()
+        write_text_atomic(output, content)
+        transaction.complete_action(0)
+        transaction.complete()
+    except Exception as exc:
+        raise_transaction_failure(
+            transaction,
+            exc,
+            [
+                f"Review the transaction record at {transaction.path}.",
+                f"Inspect the generated context target at {output} before retrying.",
+            ],
+        )
+    if emit_json_result(
+        args,
+        "reference.context",
+        exit_code,
+        dry_run=False,
+        plan=plan,
+        data=transaction_data({"output": str(output)}, transaction),
+    ):
         return exit_code
     print(f"Wrote reference context: {output}")
+    print(f"Transaction: {transaction.path}")
     return exit_code
 
 
@@ -543,9 +690,25 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if hasattr(args, "depth") and args.depth < 1:
-        raise ReferenceLibraryError("Clone depth must be at least 1.")
-    return int(args.handler(args) or 0)
+    try:
+        if hasattr(args, "depth") and args.depth < 1:
+            raise ReferenceLibraryError("Clone depth must be at least 1.")
+        return int(args.handler(args) or 0)
+    except ReferenceLibraryError as error:
+        if not getattr(args, "json_output", False):
+            raise
+        data = {"transaction": error.transaction} if error.transaction else {}
+        print_result(
+            operation_result(
+                f"reference.{args.command}",
+                1,
+                dry_run=bool(getattr(args, "dry_run", False)),
+                data=data,
+                blocked_by=[str(error)],
+                recovery=error.recovery,
+            )
+        )
+        return 1
 
 
 if __name__ == "__main__":
@@ -553,4 +716,8 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except ReferenceLibraryError as error:
         write_stderr(str(error))
+        if error.transaction:
+            write_stderr(f"Transaction: {error.transaction.get('path', '<unknown>')}")
+        for recovery_step in error.recovery:
+            write_stderr(f"Recovery: {recovery_step}")
         raise SystemExit(1)

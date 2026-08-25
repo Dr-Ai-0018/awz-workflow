@@ -14,6 +14,8 @@
 - Windows `awz.bat` / `awz.ps1` 与 POSIX `awz.sh` 终端交互入口。
 - TUI 的强制 DryRun、确认执行、脚本化参数和跨平台 smoke 覆盖。
 - Reference Library 的项目映射、离线状态检查、结构化 plan/result 和跨平台管理入口。
+- Reference Library 写操作的持久 transaction 记录、逐 action 完成状态、失败恢复信息和敏感 URL 脱敏。
+- Reference Library transaction 与 JSON apply contract 的无网络隔离测试。
 - 初始化项目新增统一的 `docs/references/` 背景与资料入口，Reference Library context 同目录生成。
 - Agent 协作规则支持单 Agent、双 Agent、三 Agent 与四个以上团队按实际 model/harness 能力动态选择策略。
 - 以语义边界触发的阶段收口与恢复链，不依赖 token 阈值或 Harness compaction。
