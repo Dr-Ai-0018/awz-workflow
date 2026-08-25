@@ -133,7 +133,7 @@ bash scripts/smoke-awz-tui.sh
 TUI 后续按独立 action/subcommand 扩展：
 
 1. `doctor`：检查 Git、PowerShell/Bash、uv、pnpm 等环境能力，只报告不安装。
-2. `refresh`：基于 manifest hash 展示 AWZ 管理文件差异，再选择 apply。
+2. `refresh`：安全核心与 Windows/POSIX 脚本入口已具备；下一步接入主菜单，基于 manifest hash 展示 AWZ 管理文件分类，再选择 apply。
 3. `plan --json`：输出机器可读变更计划，供更完整的终端向导或其他前端消费。
 4. 技术栈初始化：仅在用户明确选择 Python/Node 等类型后调用独立脚手架，不并入通用 init。
 

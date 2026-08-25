@@ -16,6 +16,7 @@
 - Windows `cmd` 快捷入口是 `scripts/init-project.bat`，只转发到 PowerShell 实现；
 - Ubuntu/POSIX 初始化入口是 `scripts/init-project.sh`；
 - Unreleased 的可选 Reference Library 入口是 `scripts/reference-library.ps1` / `scripts/reference-library.sh`，共享 Python 标准库核心；
+- Unreleased 的安全项目升级入口是 `scripts/refresh-project.ps1` / `scripts/refresh-project.sh`，共享 Python 标准库核心且不改变初始化器前置条件；
 - 两端都支持 dry-run、强制覆盖、UTF-8 模板渲染和 `git init -b main`；
 - Windows 与 POSIX 的 release 打包入口分别是 `package-release.ps1`、`package-release.sh`；
 - Windows PowerShell 与真实 Ubuntu VPS 的 dry-run、真实初始化和解压隔离 smoke 均已验证。
@@ -105,6 +106,9 @@ awz-workflow-v0.2.0/
 │  ├─ reference-library.py
 │  ├─ reference-library.ps1
 │  ├─ reference-library.sh
+│  ├─ refresh-project.py
+│  ├─ refresh-project.ps1
+│  ├─ refresh-project.sh
 │  ├─ package-release.ps1
 │  └─ package-release.sh
 └─ templates/
@@ -144,6 +148,8 @@ bash scripts/smoke-awz-tui.sh
 初始化器 smoke 覆盖 dry-run、`main` 初始化、忽略规则、非空目录拒绝、显式已有项目模式、`--force`/`-Force` 边界、BAT 参数转发、非法文件目标和工作流源码目录保护。TUI smoke 覆盖强制预览、DryRunOnly、确认后执行、BAT 转发和非空目标拒绝；release 前的解压隔离 smoke 仍需单独执行。
 
 Reference Library 变更同时运行 `smoke-reference-library.ps1` / `smoke-reference-library.sh`；smoke 使用本地 fixture，不访问公网。
+
+refresh 变更同时运行 `smoke-refresh-project.ps1` / `smoke-refresh-project.sh`；测试必须使用隔离项目，覆盖首次 manifest 接管、稳定 no-op、本地冲突阻止和 stale plan 拒绝。
 
 打包入口默认拒绝 dirty worktree。仅为本地 smoke 时，可以显式使用 `-AllowDirty` 或 `--allow-dirty`；正式 release 禁止使用这个开关。
 

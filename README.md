@@ -87,6 +87,9 @@ AWZ 的 checkpoint 是轻量的信息收口约定，不监测 token，不介入 
 │  ├─ reference-library.py
 │  ├─ reference-library.ps1
 │  ├─ reference-library.sh
+│  ├─ refresh-project.py
+│  ├─ refresh-project.ps1
+│  ├─ refresh-project.sh
 │  ├─ smoke-awz-tui.ps1
 │  ├─ smoke-awz-tui.sh
 │  ├─ smoke-init-project.ps1
@@ -146,6 +149,25 @@ Reference Library 把 GSAP 这类长期参考源码放在业务项目之外，�
 初始化器只生成空 mapping 和 `docs/references/README.md` 背景/资料入口，不联网、不 clone。`context` 默认把本机解析结果写入同目录的 `reference-context.md`；真实第三方源码始终位于业务项目之外。参考库的 configure、add、map、context 和 doctor 使用独立命令，详见 [参考项目库工作流](workflows/reference-library.md)。
 
 Reference Library 的写操作会在机器级 reference root 的 `logs/transactions/` 留下脱敏 transaction 记录，包含计划 hash、已完成/未完成 action、终态和失败恢复步骤。它用于审计与恢复，不保存 credential-bearing URL、token 或 cookie。
+
+## 安全刷新已有项目
+
+`refresh-project` 是独立于 `init` 的 AWZ 管理文件升级路径。它只管理通用 Agent 入口、guide 和模板，不覆盖项目自有的 README、LICENSE、status、references、collaboration 或 frontend 配置。首次运行会用 `docs/agent-room/.awz-manifest.json` 接管与当前模板完全一致的文件；遇到本地改写、目录/符号目标或损坏 manifest 时整体阻止。
+
+PowerShell：
+
+```powershell
+$preview = & '.\scripts\refresh-project.ps1' --target 'E:\Project\Example' --dry-run --json | ConvertFrom-Json
+& '.\scripts\refresh-project.ps1' --target 'E:\Project\Example' --apply --plan-hash $preview.plan.planHash
+```
+
+POSIX：
+
+```bash
+bash scripts/refresh-project.sh --target "$HOME/projects/example" --dry-run
+```
+
+apply 必须携带上一轮 DryRun 的 `planHash`；源模板、目标文件或 manifest 状态变化时拒绝执行。覆盖前备份位于项目本地 ignored `docs/agent-room/refresh-backups/`。该可选命令使用 Python 3 标准库，不改变初始化器无 Python 前置的边界。
 
 ## 终端交互入口
 

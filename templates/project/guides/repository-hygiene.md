@@ -23,3 +23,11 @@
 - `temp/logs/`
 
 临时产物若形成长期结论，应提升到代码、README、正式文档、ADR、issue 或 PR，而不是把整个产物提交进仓库。
+
+## AWZ 管理文件刷新
+
+- 项目升级使用 AWZ 的独立 `refresh-project` DryRun/apply 入口，不用 `Existing + Force` 猜测覆盖范围。
+- `docs/agent-room/.awz-manifest.json` 记录 AWZ 管理文件的最后应用 hash；由工具维护，不手工修改。
+- 项目自有 README、LICENSE、status、references、collaboration 和 frontend 配置不属于 refresh 覆盖范围。
+- 发现 local modification/conflict 时整体停止；先 review 本地改动，再决定保留、手工合并或恢复通用模板。
+- refresh 覆盖前的备份和 transaction 位于 ignored `docs/agent-room/`，不能提交进业务仓库。
