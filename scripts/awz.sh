@@ -34,6 +34,14 @@ section() {
 }
 
 choose_python() {
+    case "${OSTYPE:-}" in
+        msys*|mingw*|cygwin*)
+            if command -v python >/dev/null 2>&1; then
+                printf '%s\n' 'python'
+                return
+            fi
+            ;;
+    esac
     if command -v python3 >/dev/null 2>&1; then
         printf '%s\n' 'python3'
         return
