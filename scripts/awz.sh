@@ -237,6 +237,51 @@ print("本页只读；不会执行 update。")
     if wait_back_or_exit; then return 0; else return $?; fi
 }
 
+reference_update() {
+    local reference_id choice plan_hash
+    [[ -n "${python_cmd:-}" ]] || python_cmd=$(choose_python)
+    section '更新 Reference'
+    read -r -p 'Reference id（B 返回，Q 退出）: ' reference_id
+    case "${reference_id,,}" in b) return 0 ;; q) return 10 ;; esac
+    [[ -n "$reference_id" ]] || { printf '%s\n' 'Reference id 不能为空。'; return 0; }
+    capture_json bash "$reference_cli" update --id "$reference_id" --dry-run --json
+    section "更新 $reference_id · 预览"
+    if ((json_status != 0)); then
+        print_json_error
+        printf '%s\n' '计划被阻止；请先处理 dirty/detached/diverged 状态。'
+        if wait_back_or_exit; then return 0; else return $?; fi
+    fi
+    plan_hash=$(printf '%s' "$json_output" | "$python_cmd" -c 'import json,sys; print(json.load(sys.stdin)["plan"]["planHash"])')
+    printf '%s' "$json_output" | "$python_cmd" -c '
+import json, sys
+r = json.load(sys.stdin)
+data = r.get("data", {})
+print("Local HEAD   {}".format(data.get("head")))
+print("Remote HEAD  {}".format(data.get("remoteHead")))
+print("Plan         {}".format(r.get("plan", {}).get("planHash")))
+for change in r.get("plan", {}).get("changes", []):
+    print("  {}  {}".format(change.get("kind"), change.get("summary")))
+print("输入 A 应用；B 返回；Q 退出。")
+'
+    while true; do
+        read -r -p '输入 A 应用，B 返回或 Q 退出: ' choice
+        case "${choice,,}" in
+            b) return 0 ;;
+            q) return 10 ;;
+            a) break ;;
+            *) printf '%s\n' '请输入 A、B 或 Q。' ;;
+        esac
+    done
+    capture_json bash "$reference_cli" update --id "$reference_id" --json --plan-hash "$plan_hash"
+    section "更新 $reference_id · 完成"
+    if ((json_status != 0)); then
+        print_json_error
+    else
+        printf '%s' "$json_output" | "$python_cmd" -c 'import json,sys; r=json.load(sys.stdin); d=r.get("data",{}); tx=d.get("transaction",{}); print("Local HEAD   {}".format(d.get("head"))); print("Remote HEAD  {}".format(d.get("remoteHead"))); print("Transaction  {}".format(tx.get("path"))); print("状态         {}".format(tx.get("state")))'
+    fi
+    if wait_back_or_exit; then return 0; else return $?; fi
+}
+
 reference_mapping() {
     local project
     [[ -n "${python_cmd:-}" ]] || python_cmd=$(choose_python)
@@ -435,6 +480,7 @@ reference_browser() {
             '  4. 配置 Reference root  DryRun 预览后按 planHash 应用' \
             '  5. 项目 mapping lifecycle  map、unmap 与 context 受控写入' \
             '  6. 检查 Reference 更新  只读查询 origin，不执行 update' \
+            '  7. 应用 Reference 更新  DryRun 后仅允许 fast-forward' \
             '  B. 返回控制中心' \
             '  Q. 退出'
         read -r -p '请选择: ' choice
@@ -445,6 +491,7 @@ reference_browser() {
             4) if reference_configure; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             5) if reference_project_actions; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             6) if reference_check_update; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
+            7) if reference_update; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             b) return 0 ;;
             q) return 10 ;;
             *) printf '%s\n' '无法识别输入，请使用页面显示的编号。' ;;

@@ -86,12 +86,18 @@ def write_plan(
     changes: List[Dict[str, Any]],
     snapshot_targets: List[Path],
     validated_inputs: Optional[Dict[str, Any]] = None,
+    warnings: Optional[List[str]] = None,
+    blocked_by: Optional[List[str]] = None,
+    recovery: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     return build_plan(
         operation,
         changes,
         snapshot_paths(snapshot_targets),
         validated_inputs=validated_inputs,
+        warnings=warnings,
+        blocked_by=blocked_by,
+        recovery=recovery,
     )
 
 
@@ -536,6 +542,152 @@ def command_check_update(args: argparse.Namespace) -> int:
     return exit_code
 
 
+def command_update(args: argparse.Namespace) -> int:
+    """Fast-forward a reference repository and refresh its catalog metadata."""
+
+    require_git()
+    reference_id = validate_reference_id(args.id)
+    config, _, _ = load_config()
+    root = library_root(config)
+    catalogs = load_catalogs(root)
+    catalog = catalogs.get(reference_id)
+    if catalog is None:
+        raise ReferenceLibraryError(f"Reference id is not registered: {reference_id}")
+    state = repository_state(root, catalog)
+    if state.get("status") in ("missing", "invalid", "error"):
+        raise ReferenceLibraryError(
+            f"Reference repository is not updateable: {reference_id}; "
+            + "; ".join(str(item) for item in state.get("issues", []))
+        )
+    repo_path = Path(str(state["path"]))
+    head = str(state.get("head") or run_git(["rev-parse", "HEAD"], cwd=repo_path).stdout.strip())
+    branch = str(state.get("branch") or "detached")
+    remote = str(state.get("remote") or "")
+    blocked_by: List[str] = []
+    warnings: List[str] = []
+    if not remote:
+        blocked_by.append("reference has no origin remote")
+    if bool(state.get("dirty")):
+        blocked_by.append("repository worktree is dirty")
+    if branch == "detached":
+        blocked_by.append("repository HEAD is detached")
+
+    remote_ref = f"refs/heads/{branch}" if branch != "detached" else "HEAD"
+    remote_head = ""
+    inspection_ref = f"refs/awz/check-update/{reference_id}"
+    if not blocked_by:
+        remote_process = run_git(["ls-remote", remote, remote_ref], cwd=repo_path)
+        remote_lines = [line.split() for line in remote_process.stdout.splitlines() if line.strip()]
+        remote_head = remote_lines[0][0] if remote_lines else ""
+        if not remote_head:
+            blocked_by.append(f"remote branch is unavailable: {branch}")
+        else:
+            run_git(
+                [
+                    "fetch",
+                    "--no-tags",
+                    "--no-recurse-submodules",
+                    "origin",
+                    f"+{remote_ref}:{inspection_ref}",
+                ],
+                cwd=repo_path,
+            )
+            remote_head = run_git(["rev-parse", inspection_ref], cwd=repo_path).stdout.strip()
+            ancestor = run_git(["merge-base", "--is-ancestor", head, remote_head], cwd=repo_path, check=False)
+            if ancestor.returncode != 0:
+                blocked_by.append("remote and local history is not fast-forward compatible")
+
+    changes = [
+        {"kind": "git-fetch", "target": str(repo_path), "summary": f"获取 origin/{branch} 到受控 inspection ref"},
+        {"kind": "git-merge-ff-only", "target": str(repo_path), "summary": f"将 HEAD 从 {head[:12]} 快进到 {remote_head[:12] or '<unavailable>'}"},
+        {"kind": "write-json", "target": str(catalog_path(root, reference_id)), "summary": "刷新 catalog revision、版本与更新时间"},
+    ]
+    plan = write_plan(
+        "reference.update",
+        changes,
+        [catalog_path(root, reference_id), repo_path],
+        {
+            "id": reference_id,
+            "branch": branch,
+            "head": head,
+            "remote": sanitize_url(remote),
+            "remoteRef": remote_ref,
+            "remoteHead": remote_head,
+            "inspectionRef": inspection_ref,
+        },
+        warnings=warnings,
+        blocked_by=blocked_by,
+        recovery=[
+            "Review the dirty or divergent repository before retrying update.",
+            "Re-run update --dry-run after the repository state is intentionally changed.",
+        ],
+    )
+    if args.dry_run:
+        if emit_json_result(
+            args,
+            "reference.update",
+            1 if blocked_by else 0,
+            dry_run=True,
+            plan=plan,
+            data={
+                "id": reference_id,
+                "head": head,
+                "remoteHead": remote_head or None,
+                "status": "blocked" if blocked_by else ("up-to-date" if head == remote_head else "update-available"),
+            },
+        ):
+            return 1 if blocked_by else 0
+        print(f"Reference: {reference_id}")
+        print(f"Local HEAD: {head}")
+        print(f"Remote HEAD: {remote_head or '-'}")
+        for blocker in blocked_by:
+            print(f"Blocked: {blocker}")
+        if not blocked_by and head == remote_head:
+            print("Already up to date; no changes are required.")
+        else:
+            print("DryRun: would fast-forward the repository and refresh catalog metadata.")
+        return 1 if blocked_by else 0
+    if blocked_by:
+        raise ReferenceLibraryError("Update blocked: " + "; ".join(blocked_by), recovery=plan["recovery"])
+    validate_apply_plan(args, plan)
+    transaction = start_transaction(root, "reference.update", plan)
+    try:
+        current_head = run_git(["rev-parse", "HEAD"], cwd=repo_path).stdout.strip()
+        current_remote_head = run_git(["rev-parse", inspection_ref], cwd=repo_path).stdout.strip()
+        if current_head != head or current_remote_head != remote_head:
+            raise ReferenceLibraryError("Repository state changed after DryRun; re-run update --dry-run before applying.")
+        transaction.begin_apply()
+        if head != remote_head:
+            run_git(["merge", "--ff-only", inspection_ref], cwd=repo_path)
+        transaction.complete_action(0)
+        updated_catalog = dict(catalog)
+        updated_catalog["revision"] = remote_head
+        updated_catalog["version"] = detect_version(repo_path)
+        updated_catalog["license"] = detect_license(repo_path)
+        updated_catalog["updatedAt"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        write_json_atomic(catalog_path(root, reference_id), updated_catalog)
+        transaction.complete_action(1)
+        transaction.complete_action(2)
+        transaction.complete()
+    except Exception as exc:
+        recovery = [
+            f"Review the transaction record at {transaction.path}.",
+            "Do not reset or discard the repository; inspect HEAD and catalog revision.",
+            "Re-run update --dry-run to reconcile the remaining catalog action.",
+        ]
+        raise_transaction_failure(transaction, exc, recovery)
+    result_data = transaction_data(
+        {"id": reference_id, "head": head, "remoteHead": remote_head, "updated": head != remote_head},
+        transaction,
+    )
+    if emit_json_result(args, "reference.update", 0, dry_run=False, plan=plan, data=result_data):
+        return 0
+    print(f"Updated reference {reference_id}: {head[:12]} -> {remote_head[:12]}")
+    print(f"Catalog: {catalog_path(root, reference_id)}")
+    print(f"Transaction: {transaction.path}")
+    return 0
+
+
 def command_map(args: argparse.Namespace) -> int:
     reference_id = validate_reference_id(args.id)
     project = require_project(args.project)
@@ -846,6 +998,12 @@ def build_parser() -> argparse.ArgumentParser:
     check_update.add_argument("--remote", action="store_true", help="Query origin with git ls-remote (read-only).")
     add_contract_options(check_update)
     check_update.set_defaults(handler=command_check_update)
+
+    update = subparsers.add_parser("update", help="Fast-forward a reference repository and refresh its catalog.")
+    update.add_argument("--id", required=True)
+    update.add_argument("--dry-run", action="store_true", help="Preview remote fast-forward without changing the worktree.")
+    add_contract_options(update, writable=True)
+    update.set_defaults(handler=command_update)
 
     for name, handler in (("map", command_map), ("unmap", command_unmap)):
         command = subparsers.add_parser(name, help=f"{name.title()} a project reference.")

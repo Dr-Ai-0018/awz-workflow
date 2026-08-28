@@ -485,6 +485,32 @@ function Invoke-ReferenceCheckUpdate {
     }
 }
 
+function Invoke-ReferenceUpdate {
+    param([string]$ReferenceCli)
+
+    $referenceId = Read-AwzTuiText -Title "更新 Reference" -Label "Reference id" -Hint "只允许 fast-forward；dirty、detached 或 diverged 仓库会被阻止" -Step "HOME  ───  REFERENCE  ───  [UPDATE]" -Required -AllowBack -ExitOnQuit
+    if ($referenceId -eq "__AWZ_EXIT__") { return "exit" }
+    if ($referenceId -eq "__AWZ_BACK__") { return "back" }
+    try {
+        $applied = Invoke-ReferencePlanApply -ReferenceCli $ReferenceCli -Arguments @("update", "--id", $referenceId) -Title "更新 $referenceId"
+        if ($applied -eq "__AWZ_EXIT__") { return "exit" }
+        if ($applied -eq "__AWZ_BACK__") { return "back" }
+        $transaction = $applied.data.transaction
+        return Show-AwzReadOnlyPage -Title "Reference 已更新" -Subtitle "fast-forward 与 catalog 刷新完成" -Content @(
+            "Reference    $($applied.data.id)",
+            "Local HEAD   $($applied.data.head)",
+            "Remote HEAD  $($applied.data.remoteHead)",
+            "Transaction  $($transaction.path)",
+            "状态         $($transaction.state)",
+            "",
+            "未执行 reset、stash 或强制覆盖。"
+        ) -Step "HOME  ───  REFERENCE  ───  [UPDATE DONE]"
+    }
+    catch {
+        return Show-AwzReadOnlyPage -Title "Reference 更新未完成" -Subtitle "update 被安全检查阻止" -Content @("✕ $($_.Exception.Message)", "", "请先处理 dirty/diverged 状态，再重新 DryRun。", "没有执行 reset、stash 或自动丢弃修改。") -Step "HOME  ───  [UPDATE ERROR]"
+    }
+}
+
 function Invoke-ReferenceMapping {
     param([string]$ReferenceCli)
 
@@ -656,7 +682,8 @@ function Invoke-ReferenceBrowser {
             [pscustomobject]@{ Label = "查看项目 mapping"; Description = "查看项目映射、用途、required 与 unresolved 状态"; Value = "mapping" },
             [pscustomobject]@{ Label = "配置 Reference root"; Description = "DryRun 预览后按 planHash 写入机器级配置"; Value = "configure" },
             [pscustomobject]@{ Label = "项目 mapping lifecycle"; Description = "map、unmap 与 context 的受控写入"; Value = "project-actions" },
-            [pscustomobject]@{ Label = "检查 Reference 更新"; Description = "只读查询 origin；dirty/diverged 状态明确阻止 update"; Value = "check-update" }
+            [pscustomobject]@{ Label = "检查 Reference 更新"; Description = "只读查询 origin；dirty/diverged 状态明确阻止 update"; Value = "check-update" },
+            [pscustomobject]@{ Label = "应用 Reference 更新"; Description = "DryRun 后仅允许 fast-forward，并记录 transaction"; Value = "update" }
         ) -AllowBack
         if (-not $selected) { return "exit" }
         if ($selected -eq "__AWZ_BACK__") { return "back" }
@@ -682,6 +709,10 @@ function Invoke-ReferenceBrowser {
         }
         elseif ($selected -eq "check-update") {
             $result = Invoke-ReferenceCheckUpdate -ReferenceCli $ReferenceCli
+            if ($result -eq "exit") { return "exit" }
+        }
+        elseif ($selected -eq "update") {
+            $result = Invoke-ReferenceUpdate -ReferenceCli $ReferenceCli
             if ($result -eq "exit") { return "exit" }
         }
     }

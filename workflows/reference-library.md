@@ -117,7 +117,7 @@ Agent 必须先读当前项目，再按任务命中情况读取 reference。默�
 
 `status` 默认只读、离线，检查配置、catalog、路径越界、repo、remote、HEAD、dirty state、readFirst 文件和项目 mapping 的 unresolved id。
 
-`doctor` 执行更严格的完整检查，发现错误时返回非零退出码。首版不访问远端判断是否有更新。
+`doctor` 执行更严格的完整检查，发现错误时返回非零退出码。远端更新判断使用显式 `check-update --remote` 或 `update --dry-run`；`update` 只允许 fast-forward，绝不使用 reset、stash 或强制覆盖。
 
 ## 安全与 lifecycle
 

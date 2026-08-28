@@ -297,6 +297,78 @@ class ReferenceCliTransactionTests(unittest.TestCase):
             dirty_result = json.loads(dirty.stdout)
             self.assertIn("repository worktree is dirty", dirty_result["blockedBy"])
 
+    def test_update_requires_fresh_plan_and_fast_forwards_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory)
+            config_dir = fixture / "config"
+            reference_root = fixture / "references"
+            source = fixture / "source"
+            source.mkdir()
+            readme = source / "README.md"
+            readme.write_text("initial\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.email", "awz-test@example.com"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.name", "AWZ Test"], cwd=source, check=True)
+            subprocess.run(["git", "add", "README.md"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-qm", "initial"], cwd=source, check=True)
+
+            add_preview = self.run_cli(
+                config_dir,
+                "add", "--id", "update-apply-fixture", "--url", str(source), "--allow-local", "--dry-run", "--json",
+                reference_root=reference_root,
+            )
+            add_hash = json.loads(add_preview.stdout)["plan"]["planHash"]
+            added = self.run_cli(
+                config_dir,
+                "add", "--id", "update-apply-fixture", "--url", str(source), "--allow-local", "--json", "--plan-hash", add_hash,
+                reference_root=reference_root,
+            )
+            self.assertEqual(0, added.returncode, added.stderr)
+            destination = reference_root / "repos" / "general" / "update-apply-fixture"
+            old_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=destination, check=True, text=True, stdout=subprocess.PIPE).stdout.strip()
+
+            readme.write_text("upstream one\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-qm", "upstream-one"], cwd=source, check=True)
+            preview = self.run_cli(
+                config_dir,
+                "update", "--id", "update-apply-fixture", "--dry-run", "--json", reference_root=reference_root,
+            )
+            self.assertEqual(0, preview.returncode, preview.stderr)
+            preview_result = json.loads(preview.stdout)
+            self.assertEqual("reference.update", preview_result["operation"])
+            self.assertEqual("update-available", preview_result["data"]["status"])
+            update_hash = preview_result["plan"]["planHash"]
+            self.assertEqual(old_head, subprocess.run(["git", "rev-parse", "HEAD"], cwd=destination, check=True, text=True, stdout=subprocess.PIPE).stdout.strip())
+
+            readme.write_text("upstream two\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-qm", "upstream-two"], cwd=source, check=True)
+            stale = self.run_cli(
+                config_dir,
+                "update", "--id", "update-apply-fixture", "--json", "--plan-hash", update_hash, reference_root=reference_root,
+            )
+            self.assertEqual(1, stale.returncode)
+            self.assertIn("Plan is stale", json.loads(stale.stdout)["blockedBy"][0])
+            self.assertEqual(old_head, subprocess.run(["git", "rev-parse", "HEAD"], cwd=destination, check=True, text=True, stdout=subprocess.PIPE).stdout.strip())
+
+            fresh_preview = self.run_cli(
+                config_dir,
+                "update", "--id", "update-apply-fixture", "--dry-run", "--json", reference_root=reference_root,
+            )
+            fresh_hash = json.loads(fresh_preview.stdout)["plan"]["planHash"]
+            applied = self.run_cli(
+                config_dir,
+                "update", "--id", "update-apply-fixture", "--json", "--plan-hash", fresh_hash, reference_root=reference_root,
+            )
+            self.assertEqual(0, applied.returncode, applied.stderr)
+            result = json.loads(applied.stdout)
+            self.assertEqual("completed", result["data"]["transaction"]["state"])
+            new_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=destination, check=True, text=True, stdout=subprocess.PIPE).stdout.strip()
+            self.assertNotEqual(old_head, new_head)
+            catalog = json.loads((reference_root / "catalog" / "update-apply-fixture.json").read_text(encoding="utf-8"))
+            self.assertEqual(new_head, catalog["revision"])
+
 
 if __name__ == "__main__":
     unittest.main()
