@@ -369,6 +369,74 @@ class ReferenceCliTransactionTests(unittest.TestCase):
             catalog = json.loads((reference_root / "catalog" / "update-apply-fixture.json").read_text(encoding="utf-8"))
             self.assertEqual(new_head, catalog["revision"])
 
+    def test_unregister_removes_catalog_but_preserves_repository(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory)
+            config_dir, reference_root, source = fixture / "config", fixture / "references", fixture / "source"
+            source.mkdir()
+            (source / "README.md").write_text("fixture\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.email", "awz-test@example.com"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.name", "AWZ Test"], cwd=source, check=True)
+            subprocess.run(["git", "add", "README.md"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-qm", "fixture"], cwd=source, check=True)
+            preview = self.run_cli(config_dir, "add", "--id", "unregister-fixture", "--url", str(source), "--allow-local", "--dry-run", "--json", reference_root=reference_root)
+            added = self.run_cli(config_dir, "add", "--id", "unregister-fixture", "--url", str(source), "--allow-local", "--json", "--plan-hash", json.loads(preview.stdout)["plan"]["planHash"], reference_root=reference_root)
+            self.assertEqual(0, added.returncode, added.stderr)
+            project = fixture / "project"
+            (project / ".awz").mkdir(parents=True)
+            mapping_file = project / ".awz" / "references.json"
+            mapping_file.write_text('{"schemaVersion":2,"references":[{"id":"unregister-fixture","required":true}]}\n', encoding="utf-8")
+            config_dir.mkdir(parents=True, exist_ok=True)
+            (config_dir / "config.json").write_text(json.dumps({
+                "schemaVersion": 2,
+                "referenceRoot": str(reference_root),
+                "defaultCloneDepth": 1,
+                "networkPolicy": "explicit",
+                "executionPolicy": "source-only",
+                "knownProjects": [str(project)],
+                "trashRetentionDays": 30,
+                "logRetentionDays": 90,
+            }), encoding="utf-8")
+            blocked = self.run_cli(config_dir, "unregister", "--id", "unregister-fixture", "--dry-run", "--json", reference_root=reference_root)
+            self.assertEqual(1, blocked.returncode)
+            self.assertTrue(json.loads(blocked.stdout)["blockedBy"])
+            mapping_file.write_text('{"schemaVersion":2,"references":[]}\n', encoding="utf-8")
+            unregister_preview = self.run_cli(config_dir, "unregister", "--id", "unregister-fixture", "--dry-run", "--json", reference_root=reference_root)
+            self.assertEqual(0, unregister_preview.returncode, unregister_preview.stderr)
+            applied = self.run_cli(config_dir, "unregister", "--id", "unregister-fixture", "--json", "--plan-hash", json.loads(unregister_preview.stdout)["plan"]["planHash"], reference_root=reference_root)
+            self.assertEqual(0, applied.returncode, applied.stderr)
+            self.assertFalse((reference_root / "catalog" / "unregister-fixture.json").exists())
+            self.assertTrue((reference_root / "repos" / "general" / "unregister-fixture" / ".git").exists())
+
+    def test_trash_moves_repo_and_catalog_with_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory)
+            config_dir, reference_root, source = fixture / "config", fixture / "references", fixture / "source"
+            source.mkdir()
+            (source / "README.md").write_text("fixture\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.email", "awz-test@example.com"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.name", "AWZ Test"], cwd=source, check=True)
+            subprocess.run(["git", "add", "README.md"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-qm", "fixture"], cwd=source, check=True)
+            preview = self.run_cli(config_dir, "add", "--id", "trash-fixture", "--url", str(source), "--allow-local", "--dry-run", "--json", reference_root=reference_root)
+            added = self.run_cli(config_dir, "add", "--id", "trash-fixture", "--url", str(source), "--allow-local", "--json", "--plan-hash", json.loads(preview.stdout)["plan"]["planHash"], reference_root=reference_root)
+            self.assertEqual(0, added.returncode, added.stderr)
+            trash_preview = self.run_cli(config_dir, "trash", "--id", "trash-fixture", "--dry-run", "--json", reference_root=reference_root)
+            self.assertEqual(0, trash_preview.returncode, trash_preview.stderr)
+            trash_data = json.loads(trash_preview.stdout)["data"]
+            self.assertFalse(any((reference_root / "trash").iterdir()))
+            applied = self.run_cli(config_dir, "trash", "--id", "trash-fixture", "--json", "--plan-hash", json.loads(trash_preview.stdout)["plan"]["planHash"], reference_root=reference_root)
+            self.assertEqual(0, applied.returncode, applied.stderr)
+            trash_dir = Path(trash_data["trash"])
+            self.assertFalse((reference_root / "catalog" / "trash-fixture.json").exists())
+            self.assertFalse((reference_root / "repos" / "general" / "trash-fixture").exists())
+            manifest = json.loads((trash_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual("trashed", manifest["state"])
+            self.assertTrue((trash_dir / "repo" / ".git").exists())
+            self.assertTrue((trash_dir / "catalog.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

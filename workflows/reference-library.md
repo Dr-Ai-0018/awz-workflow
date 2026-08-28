@@ -82,7 +82,7 @@ bash scripts/reference-library.sh configure --root "$HOME/AWZ References" --dry-
 bash scripts/reference-library.sh list
 ```
 
-首版支持 `configure`、`add`、`list`、`show`、`check-update`、`status`、`map`、`unmap`、`context`、`doctor`。`update` 和自动删除延后。
+当前核心支持 `configure`、`add`、`list`、`show`、`check-update`、`update`、`unregister`、`trash`、`status`、`map`、`unmap`、`context`、`doctor`。`restore` 与永久 `purge` 仍延后。
 
 参考库命令使用 Python 3 标准库核心；这只是可选 reference 能力的前置条件，不影响 `init-project.ps1` 或 `init-project.sh`。
 

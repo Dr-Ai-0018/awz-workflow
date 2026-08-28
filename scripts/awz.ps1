@@ -511,6 +511,43 @@ function Invoke-ReferenceUpdate {
     }
 }
 
+function Invoke-ReferenceRemoval {
+    param([string]$ReferenceCli)
+
+    while ($true) {
+        $selected = Select-AwzTuiOption -Title "Reference 登记生命周期" -Subtitle "删除默认进入可恢复 trash；先检查项目映射" -Step "HOME  ───  REFERENCE  ───  [REMOVAL]" -Options @(
+            [pscustomobject]@{ Label = "取消登记"; Description = "移除 catalog，保留全局 clone；映射占用时阻止"; Value = "unregister" },
+            [pscustomobject]@{ Label = "移入 trash"; Description = "repo 与 catalog 一起移入 root/trash，可恢复"; Value = "trash" }
+        ) -AllowBack
+        if (-not $selected) { return "exit" }
+        if ($selected -eq "__AWZ_BACK__") { return "back" }
+        $referenceId = Read-AwzTuiText -Title "Reference 登记生命周期" -Label "Reference id" -Hint "必须已登记；映射占用时核心层会明确阻止" -Step "HOME  ───  REFERENCE  ───  [REMOVAL]" -Required -AllowBack -ExitOnQuit
+        if ($referenceId -eq "__AWZ_EXIT__") { return "exit" }
+        if ($referenceId -eq "__AWZ_BACK__") { continue }
+        $token = if ($selected -eq "trash") { "TRASH" } else { "UNREGISTER" }
+        try {
+            $applied = Invoke-ReferencePlanApply -ReferenceCli $ReferenceCli -Arguments @($selected, "--id", $referenceId) -Title "$token $referenceId" -ConfirmToken $token
+            if ($applied -eq "__AWZ_EXIT__") { return "exit" }
+            if ($applied -eq "__AWZ_BACK__") { continue }
+            $transaction = $applied.data.transaction
+            $target = if ($selected -eq "trash") { $applied.data.trash } else { $applied.data.repository }
+            $page = Show-AwzReadOnlyPage -Title "Reference $token 已完成" -Subtitle "操作已按预览计划执行" -Content @(
+                "Reference    $($applied.data.id)",
+                "Target       $target",
+                "Transaction  $($transaction.path)",
+                "状态         $($transaction.state)",
+                "",
+                $(if ($selected -eq "trash") { "可使用 manifest 进入后续 restore；不要直接删除 trash。" } else { "全局 clone 已保留，可用同一 id 重新登记。" })
+            ) -Step "HOME  ───  REFERENCE  ───  [REMOVAL DONE]"
+            if ($page -eq "exit") { return "exit" }
+        }
+        catch {
+            $page = Show-AwzReadOnlyPage -Title "Reference $token 未完成" -Subtitle "操作被安全检查阻止" -Content @("✕ $($_.Exception.Message)", "", "请先处理映射占用或路径冲突，再重新 DryRun。") -Step "HOME  ───  [REMOVAL ERROR]"
+            if ($page -eq "exit") { return "exit" }
+        }
+    }
+}
+
 function Invoke-ReferenceMapping {
     param([string]$ReferenceCli)
 
@@ -683,7 +720,8 @@ function Invoke-ReferenceBrowser {
             [pscustomobject]@{ Label = "配置 Reference root"; Description = "DryRun 预览后按 planHash 写入机器级配置"; Value = "configure" },
             [pscustomobject]@{ Label = "项目 mapping lifecycle"; Description = "map、unmap 与 context 的受控写入"; Value = "project-actions" },
             [pscustomobject]@{ Label = "检查 Reference 更新"; Description = "只读查询 origin；dirty/diverged 状态明确阻止 update"; Value = "check-update" },
-            [pscustomobject]@{ Label = "应用 Reference 更新"; Description = "DryRun 后仅允许 fast-forward，并记录 transaction"; Value = "update" }
+            [pscustomobject]@{ Label = "应用 Reference 更新"; Description = "DryRun 后仅允许 fast-forward，并记录 transaction"; Value = "update" },
+            [pscustomobject]@{ Label = "登记生命周期"; Description = "取消登记或移入可恢复 trash；映射占用时阻止"; Value = "removal" }
         ) -AllowBack
         if (-not $selected) { return "exit" }
         if ($selected -eq "__AWZ_BACK__") { return "back" }
@@ -713,6 +751,10 @@ function Invoke-ReferenceBrowser {
         }
         elseif ($selected -eq "update") {
             $result = Invoke-ReferenceUpdate -ReferenceCli $ReferenceCli
+            if ($result -eq "exit") { return "exit" }
+        }
+        elseif ($selected -eq "removal") {
+            $result = Invoke-ReferenceRemoval -ReferenceCli $ReferenceCli
             if ($result -eq "exit") { return "exit" }
         }
     }

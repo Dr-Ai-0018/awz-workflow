@@ -151,7 +151,7 @@ TUI 后续按独立、可恢复的 lifecycle 扩展：
 
 1. 配置、add、map/unmap 与 context：先预览结构化计划，再显式 apply；
 2. check-update 与 fast-forward update：保留 dirty repo、detached、diverged 和 stale-plan 阻止；
-3. unregister、trash、restore 与最后才开放的 purge：事务、恢复和目标校验必须先齐全；
+3. unregister 与 trash：事务、映射占用检查、manifest 和目标校验必须先齐全；restore 与最后才开放的 purge 继续延后；
 4. 环境 Doctor：检查 Git、PowerShell/Bash、uv、pnpm 等能力，只报告不安装；
 5. 技术栈初始化：仅在用户明确选择 Python/Node 等类型后调用独立脚手架，不并入通用 init。
 

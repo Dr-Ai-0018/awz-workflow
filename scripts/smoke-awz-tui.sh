@@ -35,6 +35,7 @@ grep -q '^reference_project_actions()' "$tui" || die 'POSIX TUI is missing proje
 grep -q '^reference_add()' "$tui" || die 'POSIX TUI is missing the Reference add flow'
 grep -q '^reference_check_update()' "$tui" || die 'POSIX TUI is missing the Reference update check flow'
 grep -q '^reference_update()' "$tui" || die 'POSIX TUI is missing the Reference update flow'
+grep -q '^reference_removal()' "$tui" || die 'POSIX TUI is missing the Reference removal flow'
 
 menu_output=$(printf 'q\n' | bash "$tui")
 for token in 'AWZ Workflow 控制中心' '1. 创建新项目' '2. 接入已有项目' '3. Reference Library' '4. 安全刷新检查' '5. Doctor'; do

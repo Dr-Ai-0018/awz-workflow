@@ -282,6 +282,31 @@ print("输入 A 应用；B 返回；Q 退出。")
     if wait_back_or_exit; then return 0; else return $?; fi
 }
 
+reference_removal() {
+    local action reference_id token status
+    [[ -n "${python_cmd:-}" ]] || python_cmd=$(choose_python)
+    section 'Reference 登记生命周期'
+    printf '%s\n' '  1. 取消登记       移除 catalog，保留 clone' '  2. 移入 trash      repo/catalog 一起移动，可恢复' '  B. 返回' '  Q. 退出'
+    read -r -p '选择操作: ' action
+    case "${action,,}" in
+        1) action='unregister'; token='UNREGISTER' ;;
+        2) action='trash'; token='TRASH' ;;
+        b) return 0 ;;
+        q) return 10 ;;
+        *) printf '%s\n' '无法识别输入，请使用 1、2、B 或 Q。'; return 0 ;;
+    esac
+    read -r -p 'Reference id（B 返回，Q 退出）: ' reference_id
+    case "${reference_id,,}" in b) return 0 ;; q) return 10 ;; esac
+    [[ -n "$reference_id" ]] || { printf '%s\n' 'Reference id 不能为空。'; return 0; }
+    if reference_write_preview "$token $reference_id" "$token" "$action" --id "$reference_id"; then
+        status=0
+    else
+        status=$?
+    fi
+    ((status == 10)) && return 10
+    return 0
+}
+
 reference_mapping() {
     local project
     [[ -n "${python_cmd:-}" ]] || python_cmd=$(choose_python)
@@ -410,7 +435,12 @@ reference_write_preview() {
             q) return 10 ;;
             a) [[ "$confirm_token" == 'A' ]] && break ;;
             unmap) [[ "$confirm_token" == 'UNMAP' ]] && break ;;
-            *) printf '%s\n' "请输入 $confirm_token、B 或 Q。" ;;
+            *)
+                if [[ "$choice" == "$confirm_token" ]]; then
+                    break
+                fi
+                printf '%s\n' "请输入 $confirm_token、B 或 Q。"
+                ;;
         esac
     done
     capture_json bash "$reference_cli" "${operation_args[@]}" --plan-hash "$plan_hash" --json
@@ -481,6 +511,7 @@ reference_browser() {
             '  5. 项目 mapping lifecycle  map、unmap 与 context 受控写入' \
             '  6. 检查 Reference 更新  只读查询 origin，不执行 update' \
             '  7. 应用 Reference 更新  DryRun 后仅允许 fast-forward' \
+            '  8. 登记生命周期  取消登记或移入可恢复 trash' \
             '  B. 返回控制中心' \
             '  Q. 退出'
         read -r -p '请选择: ' choice
@@ -492,6 +523,7 @@ reference_browser() {
             5) if reference_project_actions; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             6) if reference_check_update; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             7) if reference_update; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
+            8) if reference_removal; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             b) return 0 ;;
             q) return 10 ;;
             *) printf '%s\n' '无法识别输入，请使用页面显示的编号。' ;;

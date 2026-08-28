@@ -46,6 +46,7 @@ try {
     Assert-True $tuiSource.Contains("function Invoke-ReferenceAdd") "Control center is missing the Reference add flow"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceCheckUpdate") "Control center is missing the Reference update check flow"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceUpdate") "Control center is missing the Reference update flow"
+    Assert-True $tuiSource.Contains("function Invoke-ReferenceRemoval") "Control center is missing the Reference removal flow"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceMapping") "Control center is missing the project mapping view"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceConfigure") "Control center is missing the Reference configure flow"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceProjectActions") "Control center is missing project mapping lifecycle actions"

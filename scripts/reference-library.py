@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +24,7 @@ from reference_library.catalog import (
     detect_license,
     detect_version,
     load_catalogs,
+    repo_path_from_catalog,
     repository_state,
     sanitize_url,
     split_values,
@@ -688,6 +690,185 @@ def command_update(args: argparse.Namespace) -> int:
     return 0
 
 
+def known_reference_mappings(config: Dict[str, Any], reference_id: str) -> List[Dict[str, Any]]:
+    mappings: List[Dict[str, Any]] = []
+    for value in config.get("knownProjects", []) or []:
+        if not isinstance(value, str) or not value.strip():
+            continue
+        project = resolved_path(value)
+        mapping_path = project_mapping_path(project)
+        if not mapping_path.is_file():
+            continue
+        try:
+            mapping = load_project_mapping(project)
+        except ReferenceLibraryError:
+            mappings.append({"project": str(project), "status": "invalid", "path": str(mapping_path)})
+            continue
+        for entry in mapping.get("references", []):
+            if isinstance(entry, dict) and str(entry.get("id", "")) == reference_id:
+                mappings.append(
+                    {
+                        "project": str(project),
+                        "status": "mapped",
+                        "required": bool(entry.get("required")),
+                        "purpose": str(entry.get("purpose", "")),
+                    }
+                )
+    return mappings
+
+
+def command_unregister(args: argparse.Namespace) -> int:
+    reference_id = validate_reference_id(args.id)
+    config, _, _ = load_config()
+    root = library_root(config)
+    catalogs = load_catalogs(root)
+    catalog = catalogs.get(reference_id)
+    if catalog is None:
+        raise ReferenceLibraryError(f"Reference id is not registered: {reference_id}")
+    catalog_file = catalog_path(root, reference_id)
+    repo_path = repo_path_from_catalog(root, catalog)
+    mappings = known_reference_mappings(config, reference_id)
+    blocked_by = [
+        f"reference is still mapped in known project: {item['project']}"
+        for item in mappings
+        if item.get("status") == "mapped"
+    ]
+    warnings = [
+        f"known project mapping could not be read: {item['project']}"
+        for item in mappings
+        if item.get("status") == "invalid"
+    ]
+    plan = write_plan(
+        "reference.unregister",
+        [{"kind": "remove-file", "target": str(catalog_file), "summary": "移除 catalog 登记并保留全局 clone"}],
+        [catalog_file, repo_path],
+        {"id": reference_id, "catalog": str(catalog_file), "repository": str(repo_path), "mappings": mappings},
+        warnings=warnings,
+        blocked_by=blocked_by,
+        recovery=[
+            "The repository clone is preserved and can be re-registered with the same id.",
+            "Remove known project mappings, then re-run unregister --dry-run.",
+        ],
+    )
+    if args.dry_run:
+        exit_code = 1 if blocked_by else 0
+        if emit_json_result(args, "reference.unregister", exit_code, dry_run=True, plan=plan, data={"id": reference_id, "repositoryPreserved": True}):
+            return exit_code
+        print(f"Reference: {reference_id}")
+        print(f"DryRun: would remove catalog {catalog_file}")
+        print(f"Repository preserved: {repo_path}")
+        for blocker in blocked_by:
+            print(f"Blocked: {blocker}")
+        return exit_code
+    if blocked_by:
+        raise ReferenceLibraryError("Unregister blocked: " + "; ".join(blocked_by), recovery=plan["recovery"])
+    validate_apply_plan(args, plan)
+    transaction = start_transaction(root, "reference.unregister", plan)
+    try:
+        transaction.begin_apply()
+        catalog_file.unlink()
+        transaction.complete_action(0)
+        transaction.complete()
+    except Exception as exc:
+        raise_transaction_failure(transaction, exc, [f"Review transaction record at {transaction.path}.", f"Repository remains preserved at {repo_path}."])
+    data = transaction_data({"id": reference_id, "repositoryPreserved": True, "repository": str(repo_path)}, transaction)
+    if emit_json_result(args, "reference.unregister", 0, dry_run=False, plan=plan, data=data):
+        return 0
+    print(f"Unregistered reference {reference_id}; repository preserved at {repo_path}")
+    print(f"Transaction: {transaction.path}")
+    return 0
+
+
+def command_trash(args: argparse.Namespace) -> int:
+    reference_id = validate_reference_id(args.id)
+    config, _, _ = load_config()
+    root = library_root(config)
+    catalogs = load_catalogs(root)
+    catalog = catalogs.get(reference_id)
+    if catalog is None:
+        raise ReferenceLibraryError(f"Reference id is not registered: {reference_id}")
+    catalog_file = catalog_path(root, reference_id)
+    repo_path = repo_path_from_catalog(root, catalog)
+    mappings = known_reference_mappings(config, reference_id)
+    blocked_by = [f"reference is still mapped in known project: {item['project']}" for item in mappings if item.get("status") == "mapped"]
+    warnings = [f"known project mapping could not be read: {item['project']}" for item in mappings if item.get("status") == "invalid"]
+    catalog_time = str(catalog.get("updatedAt") or catalog.get("createdAt") or "")
+    stable_time = "".join(character for character in catalog_time if character.isalnum())
+    if not stable_time:
+        stable_time = f"legacy{str(catalog.get('revision') or 'unknown')[:12]}"
+    trash_dir = require_within(root / "trash" / f"{stable_time}-{reference_id}", root, "Trash target")
+    if trash_dir.exists():
+        raise ReferenceLibraryError(f"Trash target already exists: {trash_dir}; retry after reviewing the existing manifest")
+    trash_repo = trash_dir / "repo"
+    trash_catalog = trash_dir / "catalog.json"
+    manifest_path = trash_dir / "manifest.json"
+    repo_state = repository_state(root, catalog)
+    manifest = {
+        "schemaVersion": 1,
+        "id": reference_id,
+        "state": "planned",
+        "createdAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "original": {"catalog": str(catalog_file.relative_to(root).as_posix()), "repository": str(repo_path.relative_to(root).as_posix())},
+        "catalog": catalog,
+        "repositoryState": {"head": repo_state.get("head"), "dirty": bool(repo_state.get("dirty")), "status": repo_state.get("status")},
+        "mappings": mappings,
+    }
+    plan = write_plan(
+        "reference.trash",
+        [
+            {"kind": "ensure-layout", "target": str(trash_dir), "summary": "创建可恢复 trash 目录"},
+            {"kind": "write-manifest", "target": str(manifest_path), "summary": "写入恢复 manifest"},
+            {"kind": "move-repository", "target": str(trash_repo), "summary": "将 reference clone 移入 trash"},
+            {"kind": "move-catalog", "target": str(trash_catalog), "summary": "将 catalog 快照移入 trash"},
+        ],
+        [catalog_file, repo_path, trash_dir],
+        {"id": reference_id, "trash": str(trash_dir), "mappings": mappings, "dirty": bool(repo_state.get("dirty"))},
+        warnings=warnings,
+        blocked_by=blocked_by,
+        recovery=[
+            f"Restore from the manifest at {manifest_path} when the original targets are available.",
+            "Trash preserves dirty changes; do not purge this entry until it is reviewed.",
+        ],
+    )
+    if args.dry_run:
+        exit_code = 1 if blocked_by else 0
+        if emit_json_result(args, "reference.trash", exit_code, dry_run=True, plan=plan, data={"id": reference_id, "trash": str(trash_dir), "dirty": bool(repo_state.get("dirty"))}):
+            return exit_code
+        print(f"Reference: {reference_id}")
+        print(f"DryRun: would move repository to {trash_repo}")
+        print(f"DryRun: would move catalog to {trash_catalog}")
+        for blocker in blocked_by:
+            print(f"Blocked: {blocker}")
+        return exit_code
+    if blocked_by:
+        raise ReferenceLibraryError("Trash blocked: " + "; ".join(blocked_by), recovery=plan["recovery"])
+    validate_apply_plan(args, plan)
+    transaction = start_transaction(root, "reference.trash", plan)
+    try:
+        transaction.begin_apply()
+        trash_dir.mkdir(parents=True, exist_ok=True)
+        write_json_atomic(manifest_path, manifest)
+        transaction.complete_action(0)
+        transaction.complete_action(1)
+        if repo_path.exists():
+            shutil.move(str(repo_path), str(trash_repo))
+        transaction.complete_action(2)
+        shutil.move(str(catalog_file), str(trash_catalog))
+        manifest["state"] = "trashed"
+        write_json_atomic(manifest_path, manifest)
+        transaction.complete_action(3)
+        transaction.complete()
+    except Exception as exc:
+        raise_transaction_failure(transaction, exc, [f"Review transaction record at {transaction.path}.", f"Inspect trash manifest at {manifest_path}.", "Do not delete or reset any preserved repository automatically."])
+    data = transaction_data({"id": reference_id, "trash": str(trash_dir), "manifest": str(manifest_path), "dirtyPreserved": bool(repo_state.get("dirty"))}, transaction)
+    if emit_json_result(args, "reference.trash", 0, dry_run=False, plan=plan, data=data):
+        return 0
+    print(f"Trashed reference {reference_id}: {trash_dir}")
+    print(f"Manifest: {manifest_path}")
+    print(f"Transaction: {transaction.path}")
+    return 0
+
+
 def command_map(args: argparse.Namespace) -> int:
     reference_id = validate_reference_id(args.id)
     project = require_project(args.project)
@@ -1004,6 +1185,13 @@ def build_parser() -> argparse.ArgumentParser:
     update.add_argument("--dry-run", action="store_true", help="Preview remote fast-forward without changing the worktree.")
     add_contract_options(update, writable=True)
     update.set_defaults(handler=command_update)
+
+    for name, handler in (("unregister", command_unregister), ("trash", command_trash)):
+        lifecycle = subparsers.add_parser(name, help=f"{name.title()} a reference with a recoverable plan.")
+        lifecycle.add_argument("--id", required=True)
+        lifecycle.add_argument("--dry-run", action="store_true")
+        add_contract_options(lifecycle, writable=True)
+        lifecycle.set_defaults(handler=handler)
 
     for name, handler in (("map", command_map), ("unmap", command_unmap)):
         command = subparsers.add_parser(name, help=f"{name.title()} a project reference.")
