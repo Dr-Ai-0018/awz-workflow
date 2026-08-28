@@ -199,6 +199,70 @@ else:
     if wait_back_or_exit; then return 0; else return $?; fi
 }
 
+reference_configure() {
+    local root depth choice plan_hash
+    [[ -n "${python_cmd:-}" ]] || python_cmd=$(choose_python)
+    section '配置 Reference root'
+    read -r -p 'Reference root（B 返回，Q 退出）: ' root
+    case "${root,,}" in
+        b) return 0 ;;
+        q) return 10 ;;
+    esac
+    [[ -n "$root" ]] || { printf '%s\n' 'Reference root 不能为空。'; return 0; }
+    read -r -p '默认 clone depth [1]（B 返回，Q 退出）: ' depth
+    case "${depth,,}" in
+        b) return 0 ;;
+        q) return 10 ;;
+    esac
+    depth=${depth:-1}
+    [[ "$depth" =~ ^[0-9]+$ && "$depth" -ge 1 ]] || { printf '%s\n' 'clone depth 必须是大于等于 1 的整数。'; return 0; }
+    capture_json bash "$reference_cli" configure --root "$root" --depth "$depth" --dry-run --json
+    section '配置 Reference root · 预览'
+    if ((json_status != 0)); then
+        print_json_error
+        if wait_back_or_exit; then return 0; else return $?; fi
+    fi
+    plan_hash=$(printf '%s' "$json_output" | "$python_cmd" -c 'import json,sys; print(json.load(sys.stdin)["plan"]["planHash"])')
+    printf '%s' "$json_output" | "$python_cmd" -c '
+import json, sys
+data = json.load(sys.stdin)
+plan = data.get("plan", {})
+config = data.get("data", {}).get("config", {})
+print("Root      {}".format(config.get("referenceRoot")))
+print("Depth     {}".format(config.get("defaultCloneDepth")))
+print("Plan      {}".format(plan.get("planHash")))
+for change in plan.get("changes", []):
+    print("  {}  {}".format(change.get("kind"), change.get("summary")))
+print("输入 A 应用；B 返回；Q 退出。")
+'
+    while true; do
+        read -r -p '输入 A 应用，B 返回或 Q 退出: ' choice
+        case "${choice,,}" in
+            b) return 0 ;;
+            q) return 10 ;;
+            a) break ;;
+            *) printf '%s\n' '无法识别输入，请输入 A、B 或 Q。' ;;
+        esac
+    done
+    capture_json bash "$reference_cli" configure --root "$root" --depth "$depth" --plan-hash "$plan_hash" --json
+    section '配置 Reference root · 完成'
+    if ((json_status != 0)); then
+        print_json_error
+    else
+        printf '%s' "$json_output" | "$python_cmd" -c '
+import json, sys
+data = json.load(sys.stdin)
+config = data.get("data", {}).get("config", {})
+tx = data.get("data", {}).get("transaction", {})
+print("Root         {}".format(config.get("referenceRoot")))
+print("Transaction  {}".format(tx.get("path")))
+print("状态         {}".format(tx.get("state")))
+print("本次未 clone 或更新仓库。")
+'
+    fi
+    if wait_back_or_exit; then return 0; else return $?; fi
+}
+
 reference_browser() {
     local choice status
     while true; do
@@ -206,12 +270,14 @@ reference_browser() {
         printf '%s\n' \
             '  1. 浏览全局条目  查看列表、详情与本地仓库状态' \
             '  2. 查看项目 mapping  查看用途、required 与 unresolved 状态' \
+            '  3. 配置 Reference root  DryRun 预览后按 planHash 应用' \
             '  B. 返回控制中心' \
             '  Q. 退出'
         read -r -p '请选择: ' choice
         case "${choice,,}" in
             1) if reference_list_browser; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             2) if reference_mapping; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
+            3) if reference_configure; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             b) return 0 ;;
             q) return 10 ;;
             *) printf '%s\n' '无法识别输入，请使用页面显示的编号。' ;;

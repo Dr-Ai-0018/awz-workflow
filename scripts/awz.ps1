@@ -398,13 +398,68 @@ function Invoke-ReferenceMapping {
     }
 }
 
+function Invoke-ReferenceConfigure {
+    param([string]$ReferenceCli)
+
+    $root = Read-AwzTuiText -Title "配置 Reference root" -Label "Reference root" -Hint "机器级目录；不会 clone 或更新仓库" -Step "HOME  ───  REFERENCE  ───  [CONFIGURE]" -Required -AllowBack -ExitOnQuit
+    if ($root -eq "__AWZ_EXIT__") { return "exit" }
+    if ($root -eq "__AWZ_BACK__") { return "back" }
+    $depth = Read-AwzTuiText -Title "配置 Clone depth" -Label "默认 clone depth" -Value "1" -Hint "输入大于等于 1 的整数" -Step "HOME  ───  REFERENCE  ───  [CONFIGURE]" -Required -AllowBack -ExitOnQuit
+    if ($depth -eq "__AWZ_EXIT__") { return "exit" }
+    if ($depth -eq "__AWZ_BACK__") { return "back" }
+    $depthNumber = 0
+    if (-not [int]::TryParse($depth, [ref]$depthNumber) -or $depthNumber -lt 1) {
+        return Show-AwzReadOnlyPage -Title "配置未执行" -Subtitle "clone depth 必须是大于等于 1 的整数" -Content @("输入值：$depth", "", "没有写入配置或创建 Reference root。") -Step "HOME  ───  [CONFIGURE BLOCKED]"
+    }
+    try {
+        $preview = Invoke-AwzJsonCommand -ScriptPath $ReferenceCli -Arguments @("configure", "--root", $root, "--depth", [string]$depthNumber, "--dry-run")
+        $plan = $preview.plan
+        $content = @(
+            "Root      $root",
+            "Depth     $depthNumber",
+            "Plan      $($plan.planHash)",
+            "",
+            "以下变更来自 configure DryRun："
+        )
+        foreach ($change in @($plan.changes)) {
+            $content += "  $($change.kind)  $($change.summary)"
+        }
+        $content += ""
+        $content += "输入 A 应用；B 返回；Q 退出。"
+        Show-AwzTuiFrame -Title "配置 Reference root · 预览" -Subtitle "执行前确认结构化计划" -Content $content -Step "HOME  ───  REFERENCE  ───  [CONFIGURE PREVIEW]" -Footer "A 应用；B 返回；H 帮助；Q 退出"
+        while ($true) {
+            $choice = (Read-Host "输入 A 应用，B 返回，H 帮助或 Q 退出").Trim()
+            if ($choice -match '^[bB]$') { return "back" }
+            if ($choice -match '^[qQ]$') { return "exit" }
+            if ($choice -match '^[hH?]$') {
+                Show-AwzTuiFrame -Title "配置 Reference root · 帮助" -Subtitle "本页先 DryRun，再按 planHash 应用" -Content @("A  应用当前 planHash 对应的配置计划", "B  返回输入", "Q  退出控制中心") -Step "HOME  ───  REFERENCE  ───  [CONFIGURE HELP]" -Footer "按 Enter 返回预览"
+                Read-Host "按 Enter 返回预览" | Out-Null
+                continue
+            }
+            if ($choice -notmatch '^[aA]$') { continue }
+            $applied = Invoke-AwzJsonCommand -ScriptPath $ReferenceCli -Arguments @("configure", "--root", $root, "--depth", [string]$depthNumber, "--plan-hash", [string]$plan.planHash) -AcceptedExitCodes @(0)
+            $transaction = $applied.data.transaction
+            return Show-AwzReadOnlyPage -Title "Reference root 已配置" -Subtitle "配置写入完成；仓库仍未 clone 或更新" -Content @(
+                "Root         $root",
+                "Config       $($applied.data.config.referenceRoot)",
+                "Transaction  $($transaction.path)",
+                "状态         $($transaction.state)"
+            ) -Step "HOME  ───  REFERENCE  ───  [CONFIGURE DONE]"
+        }
+    }
+    catch {
+        return Show-AwzReadOnlyPage -Title "配置 Reference root 失败" -Subtitle "没有执行未预览的写入" -Content @("✕ $($_.Exception.Message)", "", "可重新运行 DryRun 后再试。") -Step "HOME  ───  [CONFIGURE ERROR]"
+    }
+}
+
 function Invoke-ReferenceBrowser {
     param([string]$ReferenceCli)
 
     while ($true) {
         $selected = Select-AwzTuiOption -Title "Reference Library" -Subtitle "全局条目与项目 mapping（只读）" -Step "HOME  ───  [REFERENCE CENTER]" -Options @(
             [pscustomobject]@{ Label = "浏览全局条目"; Description = "查看 reference 列表、详情与本地仓库状态"; Value = "list" },
-            [pscustomobject]@{ Label = "查看项目 mapping"; Description = "查看项目映射、用途、required 与 unresolved 状态"; Value = "mapping" }
+            [pscustomobject]@{ Label = "查看项目 mapping"; Description = "查看项目映射、用途、required 与 unresolved 状态"; Value = "mapping" },
+            [pscustomobject]@{ Label = "配置 Reference root"; Description = "DryRun 预览后按 planHash 写入机器级配置"; Value = "configure" }
         ) -AllowBack
         if (-not $selected) { return "exit" }
         if ($selected -eq "__AWZ_BACK__") { return "back" }
@@ -414,6 +469,10 @@ function Invoke-ReferenceBrowser {
         }
         elseif ($selected -eq "mapping") {
             $result = Invoke-ReferenceMapping -ReferenceCli $ReferenceCli
+            if ($result -eq "exit") { return "exit" }
+        }
+        elseif ($selected -eq "configure") {
+            $result = Invoke-ReferenceConfigure -ReferenceCli $ReferenceCli
             if ($result -eq "exit") { return "exit" }
         }
     }

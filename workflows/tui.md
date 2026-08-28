@@ -43,7 +43,7 @@ Windows 与 POSIX 默认主菜单语义一致：
 5. `Doctor`：展示 reference root、配置来源、条目状态和离线问题；
 6. `Q`：退出控制中心；子页面使用 `B` 返回。
 
-当前控制中心的 Reference、项目 mapping 与 Doctor 页面只读，refresh 页面不会提供 apply。配置、add、map/unmap、context、update、trash/restore/purge 等写操作必须等结构化预览、分级确认和恢复界面完成后再接入；在此之前继续使用 CLI，不得把少量只读页面称为完整 Reference 生命周期 TUI。
+当前控制中心的全局 Reference 浏览、项目 mapping 与 Doctor 页面只读，refresh 页面不会提供 apply；`配置 Reference root` 已接入 DryRun、planHash 和 transaction 保护。add、map/unmap、context、update、trash/restore/purge 等写操作必须等各自的结构化预览、分级确认和恢复界面完成后再接入；在此之前继续使用 CLI。
 
 ## Windows 初始化子流程
 
