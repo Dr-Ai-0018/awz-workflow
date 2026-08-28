@@ -45,6 +45,7 @@ try {
     Assert-True $tuiSource.Contains("function Invoke-ReferenceBrowser") "Control center is missing the Reference Library browser"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceMapping") "Control center is missing the project mapping view"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceConfigure") "Control center is missing the Reference configure flow"
+    Assert-True $tuiSource.Contains("function Invoke-ReferenceProjectActions") "Control center is missing project mapping lifecycle actions"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceDoctor") "Control center is missing Doctor"
     Assert-True $tuiSource.Contains("function Invoke-RefreshCheck") "Control center is missing the safe refresh check"
 

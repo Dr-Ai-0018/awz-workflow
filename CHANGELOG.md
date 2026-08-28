@@ -21,6 +21,7 @@
 - Windows/POSIX AWZ 控制中心主菜单，以及结构化 Reference 列表/详情、项目 mapping、只读 Doctor 和 refresh DryRun 页面。
 - 初始化输入与预览步骤统一支持 B 返回、Q 退出和 H/? 帮助，保持原生单行编辑与 DryRun 安全边界。
 - Reference root 配置接入跨平台 TUI：DryRun 预览、planHash 绑定 apply 与 transaction 结果页。
+- 项目 mapping lifecycle 接入跨平台 TUI：map、unmap、context 均先预览，按 planHash 应用并展示 transaction 状态；unmap 不删除全局 clone。
 - 初始化项目新增统一的 `docs/references/` 背景与资料入口，Reference Library context 同目录生成。
 - Agent 协作规则支持单 Agent、双 Agent、三 Agent 与四个以上团队按实际 model/harness 能力动态选择策略。
 - 以语义边界触发的阶段收口与恢复链，不依赖 token 阈值或 Harness compaction。

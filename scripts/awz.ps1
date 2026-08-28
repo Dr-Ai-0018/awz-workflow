@@ -281,6 +281,40 @@ function Invoke-AwzJsonCommand {
     return $result
 }
 
+function Invoke-ReferencePlanApply {
+    param(
+        [string]$ReferenceCli,
+        [string[]]$Arguments,
+        [string]$Title,
+        [string]$ConfirmToken = "A",
+        [int[]]$AcceptedExitCodes = @(0)
+    )
+
+    $preview = Invoke-AwzJsonCommand -ScriptPath $ReferenceCli -Arguments (@($Arguments) + @("--dry-run")) -AcceptedExitCodes $AcceptedExitCodes
+    $plan = $preview.plan
+    $content = [System.Collections.Generic.List[string]]::new()
+    $content.Add("Operation  $($preview.operation)")
+    $content.Add("Plan       $($plan.planHash)")
+    $content.Add("")
+    foreach ($change in @($plan.changes)) {
+        $content.Add("$($change.kind)  $($change.summary)")
+        $content.Add("    $($change.target)")
+    }
+    foreach ($warning in @($preview.warnings)) { $content.Add("WARN  $warning") }
+    foreach ($blocker in @($preview.blockedBy)) { $content.Add("BLOCK $blocker") }
+    $content.Add("")
+    $content.Add("输入 $ConfirmToken 应用；B 返回；Q 退出。")
+    Show-AwzTuiFrame -Title "$Title · 预览" -Subtitle "DryRun 完成；apply 必须匹配当前 planHash" -Content $content.ToArray() -Step "HOME  ───  REFERENCE  ───  [WRITE PREVIEW]" -Footer "$ConfirmToken 应用；B 返回；Q 退出"
+    while ($true) {
+        $choice = (Read-Host "输入 $ConfirmToken 应用，B 返回或 Q 退出").Trim()
+        if ($choice -match '^[bB]$') { return "__AWZ_BACK__" }
+        if ($choice -match '^[qQ]$') { return "__AWZ_EXIT__" }
+        $matches = if ($ConfirmToken -eq "A") { $choice -match '^[aA]$' } else { $choice -ceq $ConfirmToken }
+        if (-not $matches) { continue }
+        return Invoke-AwzJsonCommand -ScriptPath $ReferenceCli -Arguments (@($Arguments) + @("--plan-hash", [string]$plan.planHash)) -AcceptedExitCodes $AcceptedExitCodes
+    }
+}
+
 function Show-AwzReadOnlyPage {
     param(
         [string]$Title,
@@ -452,14 +486,84 @@ function Invoke-ReferenceConfigure {
     }
 }
 
+function Invoke-ReferenceProjectActions {
+    param([string]$ReferenceCli)
+
+    while ($true) {
+        $selected = Select-AwzTuiOption -Title "项目 Reference lifecycle" -Subtitle "所有写入都先 DryRun，再绑定 planHash apply" -Step "HOME  ───  REFERENCE  ───  [PROJECT ACTIONS]" -Options @(
+            [pscustomobject]@{ Label = "Map reference"; Description = "新增或更新项目映射；不会修改全局 clone"; Value = "map" },
+            [pscustomobject]@{ Label = "Unmap reference"; Description = "仅移除项目映射；全局 clone 保留"; Value = "unmap" },
+            [pscustomobject]@{ Label = "Generate context"; Description = "生成项目本地 reference-context.md"; Value = "context" }
+        ) -AllowBack
+        if (-not $selected) { return "exit" }
+        if ($selected -eq "__AWZ_BACK__") { return "back" }
+
+        $project = Read-AwzTuiText -Title "项目 Reference lifecycle" -Label "项目目录" -Hint "项目必须存在" -Step "HOME  ───  REFERENCE  ───  [PROJECT ACTIONS]" -Required -AllowBack -ExitOnQuit
+        if ($project -eq "__AWZ_EXIT__") { return "exit" }
+        if ($project -eq "__AWZ_BACK__") { continue }
+        try {
+            if ($selected -eq "map") {
+                $referenceId = Read-AwzTuiText -Title "Map reference" -Label "Reference id" -Hint "必须已登记到全局 catalog" -Step "HOME  ───  REFERENCE  ───  [MAP]" -Required -AllowBack -ExitOnQuit
+                if ($referenceId -eq "__AWZ_EXIT__") { return "exit" }
+                if ($referenceId -eq "__AWZ_BACK__") { continue }
+                $purpose = Read-AwzTuiText -Title "Map reference" -Label "Purpose" -Hint "可留空；说明本项目何时参考它" -Step "HOME  ───  REFERENCE  ───  [MAP]" -AllowBack -ExitOnQuit
+                if ($purpose -eq "__AWZ_EXIT__") { return "exit" }
+                if ($purpose -eq "__AWZ_BACK__") { continue }
+                $requiredChoice = Select-AwzTuiOption -Title "Map reference" -Subtitle "required mapping 不可用时会阻止完整 context" -Step "HOME  ───  REFERENCE  ───  [MAP]" -Options @(
+                    [pscustomobject]@{ Label = "Optional"; Description = "参考不可用时继续工作"; Value = "optional" },
+                    [pscustomobject]@{ Label = "Required"; Description = "参考不可用时报告阻塞"; Value = "required" }
+                ) -AllowBack
+                if (-not $requiredChoice) { return "exit" }
+                if ($requiredChoice -eq "__AWZ_BACK__") { continue }
+                $arguments = @("map", "--project", $project, "--id", $referenceId, "--purpose", $purpose)
+                if ($requiredChoice -eq "required") { $arguments += "--required" }
+                $applied = Invoke-ReferencePlanApply -ReferenceCli $ReferenceCli -Arguments $arguments -Title "Map $referenceId"
+            }
+            elseif ($selected -eq "unmap") {
+                $referenceId = Read-AwzTuiText -Title "Unmap reference" -Label "Reference id" -Hint "仅移除项目 mapping；不会删除全局 clone" -Step "HOME  ───  REFERENCE  ───  [UNMAP]" -Required -AllowBack -ExitOnQuit
+                if ($referenceId -eq "__AWZ_EXIT__") { return "exit" }
+                if ($referenceId -eq "__AWZ_BACK__") { continue }
+                $arguments = @("unmap", "--project", $project, "--id", $referenceId)
+                $applied = Invoke-ReferencePlanApply -ReferenceCli $ReferenceCli -Arguments $arguments -Title "Unmap $referenceId" -ConfirmToken "UNMAP"
+            }
+            else {
+                $output = Read-AwzTuiText -Title "Generate reference context" -Label "输出路径" -Hint "留空使用 docs/references/reference-context.md；路径必须位于项目内" -Step "HOME  ───  REFERENCE  ───  [CONTEXT]" -AllowBack -ExitOnQuit
+                if ($output -eq "__AWZ_EXIT__") { return "exit" }
+                if ($output -eq "__AWZ_BACK__") { continue }
+                $arguments = @("context", "--project", $project)
+                if ($output) { $arguments += @("--output", $output) }
+                $applied = Invoke-ReferencePlanApply -ReferenceCli $ReferenceCli -Arguments $arguments -Title "Generate reference context" -AcceptedExitCodes @(0, 1)
+            }
+
+            if ($applied -eq "__AWZ_EXIT__") { return "exit" }
+            if ($applied -eq "__AWZ_BACK__") { continue }
+            $transaction = $applied.data.transaction
+            $pageResult = Show-AwzReadOnlyPage -Title "Reference 写入完成" -Subtitle "$($applied.operation) 已按预览计划执行" -Content @(
+                "Operation    $($applied.operation)",
+                "Plan         $($applied.plan.planHash)",
+                "Transaction  $($transaction.path)",
+                "状态         $($transaction.state)",
+                "Completed    $($transaction.completed)",
+                "Remaining    $($transaction.remaining)"
+            ) -Step "HOME  ───  REFERENCE  ───  [WRITE DONE]"
+            if ($pageResult -eq "exit") { return "exit" }
+        }
+        catch {
+            $pageResult = Show-AwzReadOnlyPage -Title "Reference 写入未完成" -Subtitle "预览或 apply 被安全检查阻止" -Content @("✕ $($_.Exception.Message)", "", "重新运行 DryRun 后再试；不要复用旧 planHash。") -Step "HOME  ───  [WRITE ERROR]"
+            if ($pageResult -eq "exit") { return "exit" }
+        }
+    }
+}
+
 function Invoke-ReferenceBrowser {
     param([string]$ReferenceCli)
 
     while ($true) {
-        $selected = Select-AwzTuiOption -Title "Reference Library" -Subtitle "全局条目与项目 mapping（只读）" -Step "HOME  ───  [REFERENCE CENTER]" -Options @(
+        $selected = Select-AwzTuiOption -Title "Reference Library" -Subtitle "全局浏览、项目 mapping 与受控写入" -Step "HOME  ───  [REFERENCE CENTER]" -Options @(
             [pscustomobject]@{ Label = "浏览全局条目"; Description = "查看 reference 列表、详情与本地仓库状态"; Value = "list" },
             [pscustomobject]@{ Label = "查看项目 mapping"; Description = "查看项目映射、用途、required 与 unresolved 状态"; Value = "mapping" },
-            [pscustomobject]@{ Label = "配置 Reference root"; Description = "DryRun 预览后按 planHash 写入机器级配置"; Value = "configure" }
+            [pscustomobject]@{ Label = "配置 Reference root"; Description = "DryRun 预览后按 planHash 写入机器级配置"; Value = "configure" },
+            [pscustomobject]@{ Label = "项目 mapping lifecycle"; Description = "map、unmap 与 context 的受控写入"; Value = "project-actions" }
         ) -AllowBack
         if (-not $selected) { return "exit" }
         if ($selected -eq "__AWZ_BACK__") { return "back" }
@@ -473,6 +577,10 @@ function Invoke-ReferenceBrowser {
         }
         elseif ($selected -eq "configure") {
             $result = Invoke-ReferenceConfigure -ReferenceCli $ReferenceCli
+            if ($result -eq "exit") { return "exit" }
+        }
+        elseif ($selected -eq "project-actions") {
+            $result = Invoke-ReferenceProjectActions -ReferenceCli $ReferenceCli
             if ($result -eq "exit") { return "exit" }
         }
     }

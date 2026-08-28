@@ -263,6 +263,84 @@ print("本次未 clone 或更新仓库。")
     if wait_back_or_exit; then return 0; else return $?; fi
 }
 
+reference_write_preview() {
+    local title=$1 confirm_token=$2 plan_hash choice
+    shift 2
+    local -a operation_args=("$@")
+    capture_json bash "$reference_cli" "${operation_args[@]}" --dry-run --json
+    section "$title · 预览"
+    if ((json_status != 0 && json_status != 1)); then
+        print_json_error
+        if wait_back_or_exit; then return 0; else return $?; fi
+    fi
+    plan_hash=$(printf '%s' "$json_output" | "$python_cmd" -c 'import json,sys; print(json.load(sys.stdin).get("plan",{}).get("planHash"))')
+    printf '%s' "$json_output" | "$python_cmd" -c 'import json,sys; r=json.load(sys.stdin); print("Operation  {}".format(r.get("operation"))); print("Plan       {}".format(r.get("plan",{}).get("planHash"))); [print("  {}  {}".format(c.get("kind"),c.get("summary"))) for c in r.get("plan",{}).get("changes",[])]; print("输入 {} 应用；B 返回；Q 退出。".format(sys.argv[1]))' "$confirm_token"
+    while true; do
+        read -r -p "输入 $confirm_token 应用，B 返回或 Q 退出: " choice
+        case "${choice,,}" in
+            b) return 0 ;;
+            q) return 10 ;;
+            a) [[ "$confirm_token" == 'A' ]] && break ;;
+            unmap) [[ "$confirm_token" == 'UNMAP' ]] && break ;;
+            *) printf '%s\n' "请输入 $confirm_token、B 或 Q。" ;;
+        esac
+    done
+    capture_json bash "$reference_cli" "${operation_args[@]}" --plan-hash "$plan_hash" --json
+    section "$title · 完成"
+    if ((json_status != 0 && json_status != 1)); then
+        print_json_error
+    else
+        printf '%s' "$json_output" | "$python_cmd" -c 'import json,sys; r=json.load(sys.stdin); tx=r.get("data",{}).get("transaction",{}); print("Operation    {}".format(r.get("operation"))); print("Transaction  {}".format(tx.get("path"))); print("状态         {}".format(tx.get("state")))'
+    fi
+    if wait_back_or_exit; then return 0; else return $?; fi
+}
+
+reference_project_actions() {
+    local choice project reference_id purpose required output status
+    [[ -n "${python_cmd:-}" ]] || python_cmd=$(choose_python)
+    while true; do
+        section '项目 Reference lifecycle'
+        printf '%s\n' '  1. Map reference       DryRun 后写入项目 mapping' '  2. Unmap reference     仅移除项目 mapping，保留全局 clone' '  3. Generate context    DryRun 后生成项目 reference context' '  B. 返回' '  Q. 退出'
+        read -r -p '请选择: ' choice
+        case "${choice,,}" in
+            b) return 0 ;;
+            q) return 10 ;;
+            1)
+                read -r -p '项目目录（B 返回，Q 退出）: ' project
+                case "${project,,}" in b) continue ;; q) return 10 ;; esac
+                read -r -p 'Reference id（B 返回，Q 退出）: ' reference_id
+                case "${reference_id,,}" in b) continue ;; q) return 10 ;; esac
+                read -r -p 'Purpose（可留空；B 返回，Q 退出）: ' purpose
+                case "${purpose,,}" in b) continue ;; q) return 10 ;; esac
+                read -r -p 'Required? [y/N]（B 返回，Q 退出）: ' required
+                case "${required,,}" in b) continue ;; q) return 10 ;; esac
+                local -a map_args=(map --project "$project" --id "$reference_id" --purpose "$purpose")
+                [[ "${required,,}" == 'y' || "${required,,}" == 'yes' ]] && map_args+=(--required)
+                if reference_write_preview "Map $reference_id" A "${map_args[@]}"; then status=0; else status=$?; fi
+                ((status == 10)) && return 10
+                ;;
+            2)
+                read -r -p '项目目录（B 返回，Q 退出）: ' project
+                case "${project,,}" in b) continue ;; q) return 10 ;; esac
+                read -r -p 'Reference id（B 返回，Q 退出）: ' reference_id
+                case "${reference_id,,}" in b) continue ;; q) return 10 ;; esac
+                if reference_write_preview "Unmap $reference_id" UNMAP unmap --project "$project" --id "$reference_id"; then status=0; else status=$?; fi
+                ((status == 10)) && return 10
+                ;;
+            3)
+                read -r -p '项目目录（B 返回，Q 退出）: ' project
+                case "${project,,}" in b) continue ;; q) return 10 ;; esac
+                read -r -p '输出路径（留空使用默认；B 返回，Q 退出）: ' output
+                case "${output,,}" in b) continue ;; q) return 10 ;; esac
+                local -a context_args=(context --project "$project")
+                [[ -n "$output" ]] && context_args+=(--output "$output")
+                if reference_write_preview "Generate reference context" A "${context_args[@]}"; then status=0; else status=$?; fi
+                ((status == 10)) && return 10
+                ;;
+        esac
+    done
+}
+
 reference_browser() {
     local choice status
     while true; do
@@ -271,6 +349,7 @@ reference_browser() {
             '  1. 浏览全局条目  查看列表、详情与本地仓库状态' \
             '  2. 查看项目 mapping  查看用途、required 与 unresolved 状态' \
             '  3. 配置 Reference root  DryRun 预览后按 planHash 应用' \
+            '  4. 项目 mapping lifecycle  map、unmap 与 context 受控写入' \
             '  B. 返回控制中心' \
             '  Q. 退出'
         read -r -p '请选择: ' choice
@@ -278,6 +357,7 @@ reference_browser() {
             1) if reference_list_browser; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             2) if reference_mapping; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             3) if reference_configure; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
+            4) if reference_project_actions; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             b) return 0 ;;
             q) return 10 ;;
             *) printf '%s\n' '无法识别输入，请使用页面显示的编号。' ;;
