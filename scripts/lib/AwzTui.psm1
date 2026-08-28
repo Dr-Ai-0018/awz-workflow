@@ -201,6 +201,13 @@ function Select-AwzTuiOption {
         if ($choice -match '^[qQ]$') {
             return $null
         }
+        if ($choice -match '^[hH?]$') {
+            $errorMessage = "帮助：输入编号选择；"
+            if ($pageCount -gt 1) { $errorMessage += "N/P 翻页；" }
+            if ($AllowBack) { $errorMessage += "B 返回；" }
+            $errorMessage += "Q 退出。"
+            continue
+        }
         if ($AllowBack -and $choice -match '^[bB]$') {
             return "__AWZ_BACK__"
         }
@@ -249,12 +256,23 @@ function Read-AwzTuiText {
         Show-AwzTuiFrame -Title $Title -Subtitle "稳定输入模式：不逐键重绘终端" -Content $content -Step $Step -Footer $footer
 
         $input = Read-Host $Label
-        if ($input -ceq "Q") {
+        if ($input -match '^[qQ]$') {
             if ($ExitOnQuit) { return "__AWZ_EXIT__" }
             return $null
         }
-        if ($AllowBack -and $input -ceq "B") {
+        if ($AllowBack -and $input -match '^[bB]$') {
             return "__AWZ_BACK__"
+        }
+        if ($input -match '^[hH?]$') {
+            Show-AwzTuiFrame -Title "$Title · 帮助" -Subtitle "输入提示" -Content @(
+                "输入完整路径或文本后按 Enter 确认。",
+                "留空时使用默认值（如果页面提供默认值）。",
+                "B 返回；Q 退出；H 或 ? 再次查看帮助。"
+            ) -Step $Step -Footer "按 Enter 返回输入"
+            $helpChoice = (Read-Host "按 Enter 返回输入").Trim()
+            if ($helpChoice -match '^[qQ]$' -and $ExitOnQuit) { return "__AWZ_EXIT__" }
+            if ($helpChoice -match '^[bB]$' -and $AllowBack) { return "__AWZ_BACK__" }
+            continue
         }
         if ($input) {
             return $input
@@ -283,16 +301,30 @@ function Show-AwzTuiPreview {
         "模式   $SelectedMode     刷新 AWZ 文件   $Refresh",
         "",
         "完整 DryRun 输出已在上一页展示并停留 3 秒，可用终端原生滚动回看。",
-        "确认无误后输入 A 应用，输入 Q 取消。"
+        "确认无误后输入 A 应用，B 返回上一步，Q 退出。"
     )
-    Show-AwzTuiFrame -Title "检查变更计划" -Subtitle "预览已通过；执行前请检查完整输出" -Content $content -Step "01  模式   ───   02  信息   ───   03 [预览]  ───   04  执行" -Footer "查看完整计划后输入 A 应用；Q 取消"
+    Show-AwzTuiFrame -Title "检查变更计划" -Subtitle "预览已通过；执行前请检查完整输出" -Content $content -Step "01  模式   ───   02  信息   ───   03 [预览]  ───   04  执行" -Footer "A 应用；B 返回上一步；H 帮助；Q 退出"
     while ($true) {
-        $choice = (Read-Host "输入 A 应用，Q 取消").Trim()
-        if ($choice -ceq "A") {
+        $choice = (Read-Host "输入 A 应用，B 返回，H 帮助或 Q 退出").Trim()
+        if ($choice -match '^[aA]$') {
             return $true
         }
         if ($choice -match '^[qQ]$') {
-            return $false
+            return "__AWZ_EXIT__"
+        }
+        if ($choice -match '^[bB]$') {
+            return "__AWZ_BACK__"
+        }
+        if ($choice -match '^[hH?]$') {
+            Show-AwzTuiFrame -Title "检查变更计划 · 帮助" -Subtitle "预览阶段不会写入文件" -Content @(
+                "A  应用已通过 DryRun 的计划",
+                "B  返回信息输入阶段",
+                "Q  退出控制中心",
+                "H  或 ? 再次查看帮助"
+            ) -Step "01  模式   ───   02  信息   ───   03 [预览]  ───   04  执行" -Footer "按 Enter 返回预览"
+            $helpChoice = (Read-Host "按 Enter 返回预览").Trim()
+            if ($helpChoice -match '^[qQ]$') { return "__AWZ_EXIT__" }
+            if ($helpChoice -match '^[bB]$') { return "__AWZ_BACK__" }
         }
     }
 }

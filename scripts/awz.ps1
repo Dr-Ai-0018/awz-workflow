@@ -186,20 +186,20 @@ function Invoke-InitializationWizard {
             $selectedMode = Select-AwzTuiOption -Title "选择工作模式" -Subtitle "新项目与已有项目采用完全不同的安全边界" -Step "01 [模式]  ───   02  信息   ───   03  预览   ───   04  执行" -Options @(
                 [pscustomobject]@{ Label = "创建新项目"; Description = "仅允许不存在或完全为空的目标目录"; Value = "New" },
                 [pscustomobject]@{ Label = "接入已有项目"; Description = "显式保留项目自有文件，只补充 AWZ 基线"; Value = "Existing" }
-            )
-            if (-not $selectedMode) { return }
+            ) -AllowBack
+            if (-not $selectedMode -or $selectedMode -eq "__AWZ_BACK__") { return }
         }
 
-        $target = Read-AwzTuiText -Title "项目位置" -Label "目标目录" -Hint "示例：E:\Project\My App" -Step "01  模式   ───   02 [信息]  ───   03  预览   ───   04  执行" -Required
-        if (-not $target) { return }
+        $target = Read-AwzTuiText -Title "项目位置" -Label "目标目录" -Hint "示例：E:\Project\My App" -Step "01  模式   ───   02 [信息]  ───   03  预览   ───   04  执行" -Required -AllowBack -ExitOnQuit
+        if (-not $target -or $target -in @("__AWZ_BACK__", "__AWZ_EXIT__")) { return }
 
         $trimmedTarget = $target.TrimEnd([char[]]@('\', '/'))
         $defaultProject = Split-Path -Leaf $trimmedTarget
-        $project = Read-AwzTuiText -Title "项目身份" -Label "项目名称" -Value $defaultProject -Hint "可直接按 Enter 使用目录名" -Step "01  模式   ───   02 [信息]  ───   03  预览   ───   04  执行" -Required
-        if (-not $project) { return }
+        $project = Read-AwzTuiText -Title "项目身份" -Label "项目名称" -Value $defaultProject -Hint "可直接按 Enter 使用目录名" -Step "01  模式   ───   02 [信息]  ───   03  预览   ───   04  执行" -Required -AllowBack -ExitOnQuit
+        if (-not $project -or $project -in @("__AWZ_BACK__", "__AWZ_EXIT__")) { return }
 
-        $licenseOwner = Read-AwzTuiText -Title "许可证信息" -Label "MIT License Owner" -Value $script:Owner -Hint "只用于生成新项目 LICENSE" -Step "01  模式   ───   02 [信息]  ───   03  预览   ───   04  执行" -Required
-        if (-not $licenseOwner) { return }
+        $licenseOwner = Read-AwzTuiText -Title "许可证信息" -Label "MIT License Owner" -Value $script:Owner -Hint "只用于生成新项目 LICENSE" -Step "01  模式   ───   02 [信息]  ───   03  预览   ───   04  执行" -Required -AllowBack -ExitOnQuit
+        if (-not $licenseOwner -or $licenseOwner -in @("__AWZ_BACK__", "__AWZ_EXIT__")) { return }
 
         $refresh = $false
         if ($selectedMode -eq "Existing") {
@@ -207,7 +207,7 @@ function Invoke-InitializationWizard {
                 [pscustomobject]@{ Label = "只补充缺失文件"; Description = "推荐；不会覆盖任何已存在文件"; Value = "Preserve" },
                 [pscustomobject]@{ Label = "刷新 AWZ 指导文件"; Description = "仅更新 AGENTS、CLAUDE 与 agent-room 模板"; Value = "Refresh" }
             )
-            if (-not $refreshChoice) { return }
+            if (-not $refreshChoice -or $refreshChoice -eq "__AWZ_BACK__") { return }
             $refresh = $refreshChoice -eq "Refresh"
         }
 
@@ -216,10 +216,10 @@ function Invoke-InitializationWizard {
         $preview = @(& $InitializerPath @params -DryRun 2>&1 | ForEach-Object { $_.ToString() })
         Show-AwzTuiLog -Title "DryRun 检查完成" -Subtitle "以下是将要发生的全部变更" -Lines $preview -Step "01  模式   ───   02  信息   ───   03 [预览]  ───   04  执行"
         $apply = Show-AwzTuiPreview -PreviewLines $preview -Target $target -Project $project -SelectedMode $selectedMode -Refresh $refresh
-        if (-not $apply) { return }
+        if ($apply -eq "__AWZ_EXIT__" -or $apply -eq "__AWZ_BACK__" -or -not $apply) { return }
 
         if ($selectedMode -eq "Existing" -and $refresh) {
-            $confirmation = Read-AwzTuiText -Title "高风险确认" -Label "输入 APPLY 继续刷新 AWZ 指导文件" -Hint "README、LICENSE、.gitignore 与 .env.example 仍不会被覆盖" -Step "01  模式   ───   02  信息   ───   03  预览   ───   04 [执行]" -Required
+            $confirmation = Read-AwzTuiText -Title "高风险确认" -Label "输入 APPLY 继续刷新 AWZ 指导文件" -Hint "README、LICENSE、.gitignore 与 .env.example 仍不会被覆盖" -Step "01  模式   ───   02  信息   ───   03  预览   ───   04 [执行]" -Required -AllowBack -ExitOnQuit
             if ($confirmation -cne "APPLY") { return }
         }
 

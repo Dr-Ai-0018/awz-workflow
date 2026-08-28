@@ -39,6 +39,8 @@ try {
     Assert-True (-not $tuiModuleSource.Contains("[Console]::ReadKey")) "Terminal wizard must not redraw the full screen for every keypress"
     Assert-True $tuiModuleSource.Contains("function Show-AwzTuiLog") "Terminal wizard must retain a dedicated activity-log view"
     Assert-True $tuiModuleSource.Contains('Start-Sleep -Seconds $PauseSeconds') "Activity logs must remain visible before the next view replaces them"
+    Assert-True $tuiModuleSource.Contains("H 或 ?") "TUI input pages must expose a help semantic"
+    Assert-True $tuiModuleSource.Contains("B 返回上一步") "TUI preview must expose a back semantic"
     Assert-True $tuiSource.Contains("function Invoke-AwzJsonCommand") "Control center must consume structured command results"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceBrowser") "Control center is missing the Reference Library browser"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceMapping") "Control center is missing the project mapping view"
