@@ -343,7 +343,7 @@ function Invoke-ReferenceListBrowser {
                     "Reference root   $($list.data.referenceRoot)",
                     "状态             尚未登记 reference",
                     "",
-                    "使用 Reference CLI add 或后续 TUI 写入流程登记项目。"
+                    '请选择 Reference Center 中的“新增 reference”开始登记。'
                 ) -Step "HOME  ───  [REFERENCE]  ───  DETAIL"
             }
 
@@ -391,6 +391,69 @@ function Invoke-ReferenceListBrowser {
             "",
             "没有执行任何 Reference Library 写操作。"
         ) -Step "HOME  ───  [REFERENCE ERROR]"
+    }
+}
+
+function Invoke-ReferenceAdd {
+    param([string]$ReferenceCli)
+
+    try {
+        $sourceKind = Select-AwzTuiOption -Title "新增 Reference" -Subtitle "先选择来源；整个流程都会先 DryRun" -Step "HOME  ───  REFERENCE  ───  [ADD SOURCE]" -Options @(
+            [pscustomobject]@{ Label = "Public Git URL"; Description = "校验公开 HTTPS/SSH 仓库地址，确认后才 clone"; Value = "public" },
+            [pscustomobject]@{ Label = "导入本地 clone"; Description = "显式允许本地 fixture/已有 Git 仓库，不访问网络"; Value = "local" }
+        ) -AllowBack
+        if (-not $sourceKind) { return "exit" }
+        if ($sourceKind -eq "__AWZ_BACK__") { return "back" }
+
+        $sourceLabel = if ($sourceKind -eq "public") { "Public Git URL" } else { "本地 clone 路径" }
+        $sourceHint = if ($sourceKind -eq "public") { "仅允许公开 HTTPS/SSH Git 地址；不会执行仓库代码" } else { "必须是独立 Git 仓库；只读探测，不会修改来源目录" }
+        $source = Read-AwzTuiText -Title "新增 Reference" -Label $sourceLabel -Hint $sourceHint -Step "HOME  ───  REFERENCE  ───  [ADD SOURCE]" -Required -AllowBack -ExitOnQuit
+        if ($source -eq "__AWZ_EXIT__") { return "exit" }
+        if ($source -eq "__AWZ_BACK__") { return "back" }
+
+        $referenceId = Read-AwzTuiText -Title "新增 Reference" -Label "Reference id" -Hint "小写字母、数字与连字符；用于 catalog 文件名和项目 mapping" -Step "HOME  ───  REFERENCE  ───  [ADD METADATA]" -Required -AllowBack -ExitOnQuit
+        if ($referenceId -eq "__AWZ_EXIT__") { return "exit" }
+        if ($referenceId -eq "__AWZ_BACK__") { return "back" }
+        $name = Read-AwzTuiText -Title "新增 Reference" -Label "显示名称" -Value $referenceId -Hint "可直接按 Enter 使用 id" -Step "HOME  ───  REFERENCE  ───  [ADD METADATA]" -Required -AllowBack -ExitOnQuit
+        if ($name -eq "__AWZ_EXIT__") { return "exit" }
+        if ($name -eq "__AWZ_BACK__") { return "back" }
+        $category = Read-AwzTuiText -Title "新增 Reference" -Label "Category" -Value "general" -Hint "例如 frontend、ai-presentation；不能包含路径分隔符" -Step "HOME  ───  REFERENCE  ───  [ADD METADATA]" -Required -AllowBack -ExitOnQuit
+        if ($category -eq "__AWZ_EXIT__") { return "exit" }
+        if ($category -eq "__AWZ_BACK__") { return "back" }
+        $depth = Read-AwzTuiText -Title "新增 Reference" -Label "Clone depth" -Value "1" -Hint "Public Git 使用浅 clone；本地导入忽略该值" -Step "HOME  ───  REFERENCE  ───  [ADD METADATA]" -Required -AllowBack -ExitOnQuit
+        if ($depth -eq "__AWZ_EXIT__") { return "exit" }
+        if ($depth -eq "__AWZ_BACK__") { return "back" }
+        $depthNumber = 0
+        if (-not [int]::TryParse($depth, [ref]$depthNumber) -or $depthNumber -lt 1) {
+            return Show-AwzReadOnlyPage -Title "新增 Reference 未执行" -Subtitle "clone depth 必须是大于等于 1 的整数" -Content @("输入值：$depth", "", "没有 clone、写入 catalog 或创建目录。") -Step "HOME  ───  [ADD BLOCKED]"
+        }
+
+        $arguments = @("add", "--id", $referenceId, "--name", $name, "--url", $source, "--category", $category, "--depth", [string]$depthNumber)
+        if ($sourceKind -eq "local") { $arguments += "--allow-local" }
+        $applied = Invoke-ReferencePlanApply -ReferenceCli $ReferenceCli -Arguments $arguments -Title "新增 $referenceId"
+        if ($applied -eq "__AWZ_EXIT__") { return "exit" }
+        if ($applied -eq "__AWZ_BACK__") { return "back" }
+        $transaction = $applied.data.transaction
+        $content = @(
+            "Operation    $($applied.operation)",
+            "Reference    $($applied.data.id)",
+            "Destination  $($applied.data.destination)",
+            "Revision     $($applied.data.revision)",
+            "Plan         $($applied.plan.planHash)",
+            "Transaction  $($transaction.path)",
+            "状态         $($transaction.state)",
+            "",
+            "仓库只被 clone/登记；未执行 submodule、hook、install 或 build。"
+        )
+        return Show-AwzReadOnlyPage -Title "Reference 已新增" -Subtitle "clone 与 catalog 登记完成" -Content $content -Step "HOME  ───  REFERENCE  ───  [ADD DONE]"
+    }
+    catch {
+        return Show-AwzReadOnlyPage -Title "新增 Reference 未完成" -Subtitle "预览或 apply 被安全检查阻止" -Content @(
+            "✕ $($_.Exception.Message)",
+            "",
+            "如果 clone 已完成但 catalog 失败，仓库会保留在 transaction 提示的 destination。",
+            "请先查看 transaction/recovery，再重新运行 DryRun；不会自动删除保留仓库。"
+        ) -Step "HOME  ───  [ADD ERROR]"
     }
 }
 
@@ -561,6 +624,7 @@ function Invoke-ReferenceBrowser {
     while ($true) {
         $selected = Select-AwzTuiOption -Title "Reference Library" -Subtitle "全局浏览、项目 mapping 与受控写入" -Step "HOME  ───  [REFERENCE CENTER]" -Options @(
             [pscustomobject]@{ Label = "浏览全局条目"; Description = "查看 reference 列表、详情与本地仓库状态"; Value = "list" },
+            [pscustomobject]@{ Label = "新增 reference"; Description = "Public Git 或本地 clone；DryRun 后按 planHash 登记"; Value = "add" },
             [pscustomobject]@{ Label = "查看项目 mapping"; Description = "查看项目映射、用途、required 与 unresolved 状态"; Value = "mapping" },
             [pscustomobject]@{ Label = "配置 Reference root"; Description = "DryRun 预览后按 planHash 写入机器级配置"; Value = "configure" },
             [pscustomobject]@{ Label = "项目 mapping lifecycle"; Description = "map、unmap 与 context 的受控写入"; Value = "project-actions" }
@@ -569,6 +633,10 @@ function Invoke-ReferenceBrowser {
         if ($selected -eq "__AWZ_BACK__") { return "back" }
         if ($selected -eq "list") {
             $result = Invoke-ReferenceListBrowser -ReferenceCli $ReferenceCli
+            if ($result -eq "exit") { return "exit" }
+        }
+        elseif ($selected -eq "add") {
+            $result = Invoke-ReferenceAdd -ReferenceCli $ReferenceCli
             if ($result -eq "exit") { return "exit" }
         }
         elseif ($selected -eq "mapping") {

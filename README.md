@@ -198,7 +198,7 @@ bash scripts/awz.sh
 
 Windows 与 POSIX 主菜单统一提供：创建新项目、接入已有项目、Reference Library、安全刷新检查和 Doctor。当前 Reference Library 支持结构化只读的全局列表、详情、本地仓库状态和项目 mapping（含 purpose、required、unresolved）；Doctor 只报告配置与离线问题；安全刷新检查只运行 manifest DryRun，绝不从控制中心 apply。初始化子流程继续使用编号选择、原生单行输入、完整 DryRun、危险确认和结果页面，并在输入/预览步骤统一提供 B 返回、Q 退出、H/? 帮助，避免逐键重绘在 Windows Terminal/ConPTY 下造成残影或错位。
 
-Reference root 配置以及项目 `map/unmap/context` 已接入控制中心：先执行 DryRun，再使用 planHash 绑定 apply，并留下 transaction 记录；登记、更新、trash/restore 等其他写入生命周期仍建议使用 CLI，直到各自的预览与恢复界面完成。自动化环境可以传入完整 init 参数和 `-Yes` / `--yes`，但不能跳过预览与底层安全检查。详细契约见 [TUI 与 CLI 工作流](workflows/tui.md)。
+Reference root 配置、Reference `add` 以及项目 `map/unmap/context` 已接入控制中心：先执行 DryRun，再使用 planHash 绑定 apply，并留下 transaction 记录；更新、trash/restore 等其他写入生命周期仍建议使用 CLI，直到各自的预览与恢复界面完成。自动化环境可以传入完整 init 参数和 `-Yes` / `--yes`，但不能跳过预览与底层安全检查。详细契约见 [TUI 与 CLI 工作流](workflows/tui.md)。
 
 ## 硬边界
 

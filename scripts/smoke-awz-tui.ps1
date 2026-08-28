@@ -43,6 +43,7 @@ try {
     Assert-True $tuiModuleSource.Contains("B 返回上一步") "TUI preview must expose a back semantic"
     Assert-True $tuiSource.Contains("function Invoke-AwzJsonCommand") "Control center must consume structured command results"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceBrowser") "Control center is missing the Reference Library browser"
+    Assert-True $tuiSource.Contains("function Invoke-ReferenceAdd") "Control center is missing the Reference add flow"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceMapping") "Control center is missing the project mapping view"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceConfigure") "Control center is missing the Reference configure flow"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceProjectActions") "Control center is missing project mapping lifecycle actions"

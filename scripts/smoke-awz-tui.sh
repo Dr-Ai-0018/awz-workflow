@@ -32,6 +32,7 @@ trap cleanup EXIT
 bash "$tui" --help >/dev/null
 grep -q '^reference_configure()' "$tui" || die 'POSIX TUI is missing the Reference configure flow'
 grep -q '^reference_project_actions()' "$tui" || die 'POSIX TUI is missing project mapping lifecycle actions'
+grep -q '^reference_add()' "$tui" || die 'POSIX TUI is missing the Reference add flow'
 
 menu_output=$(printf 'q\n' | bash "$tui")
 for token in 'AWZ Workflow 控制中心' '1. 创建新项目' '2. 接入已有项目' '3. Reference Library' '4. 安全刷新检查' '5. Doctor'; do
@@ -60,7 +61,7 @@ reference_output=$(
 [[ "$reference_output" == *'尚未登记 reference'* ]] || die 'Reference Library did not use the isolated structured result'
 
 mapping_output=$(
-    printf '3\n2\n%s\nb\nb\nq\n' "$mapping_project" |
+    printf '3\n3\n%s\nb\nb\nq\n' "$mapping_project" |
         AWZ_CONFIG_DIR="$read_only_path/config" AWZ_REFERENCE_ROOT="$read_only_path/references" bash "$tui"
 )
 [[ "$mapping_output" == *'项目 Reference mapping 结果'* ]] || die 'Project mapping view did not open'

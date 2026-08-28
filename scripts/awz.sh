@@ -162,6 +162,47 @@ for label, value in rows:
     done
 }
 
+reference_add() {
+    local source_kind source source_label reference_id name category depth choice
+    [[ -n "${python_cmd:-}" ]] || python_cmd=$(choose_python)
+    section '新增 Reference'
+    printf '%s\n' '  1. Public Git URL       校验后确认才 clone' '  2. 导入本地 clone       显式离线来源，不访问网络' '  B. 返回' '  Q. 退出'
+    read -r -p '选择来源: ' source_kind
+    case "${source_kind,,}" in
+        1) source_kind='public'; source_label='Public Git URL' ;;
+        2) source_kind='local'; source_label='本地 clone 路径' ;;
+        b) return 0 ;;
+        q) return 10 ;;
+        *) printf '%s\n' '无法识别输入，请使用 1、2、B 或 Q。'; return 0 ;;
+    esac
+    read -r -p "$source_label（B 返回，Q 退出）: " source
+    case "${source,,}" in b) return 0 ;; q) return 10 ;; esac
+    [[ -n "$source" ]] || { printf '%s\n' '来源不能为空。'; return 0; }
+    read -r -p 'Reference id（B 返回，Q 退出）: ' reference_id
+    case "${reference_id,,}" in b) return 0 ;; q) return 10 ;; esac
+    [[ -n "$reference_id" ]] || { printf '%s\n' 'Reference id 不能为空。'; return 0; }
+    read -r -p "显示名称 [$reference_id]（B 返回，Q 退出）: " name
+    case "${name,,}" in b) return 0 ;; q) return 10 ;; esac
+    name=${name:-$reference_id}
+    read -r -p 'Category [general]（B 返回，Q 退出）: ' category
+    case "${category,,}" in b) return 0 ;; q) return 10 ;; esac
+    category=${category:-general}
+    read -r -p 'Clone depth [1]（B 返回，Q 退出）: ' depth
+    case "${depth,,}" in b) return 0 ;; q) return 10 ;; esac
+    depth=${depth:-1}
+    [[ "$depth" =~ ^[0-9]+$ && "$depth" -ge 1 ]] || { printf '%s\n' 'clone depth 必须是大于等于 1 的整数。'; return 0; }
+
+    local -a add_args=(add --id "$reference_id" --name "$name" --url "$source" --category "$category" --depth "$depth")
+    [[ "$source_kind" == 'local' ]] && add_args+=(--allow-local)
+    if reference_write_preview "新增 $reference_id" A "${add_args[@]}"; then
+        return 0
+    else
+        choice=$?
+        ((choice == 10)) && return 10
+        return 0
+    fi
+}
+
 reference_mapping() {
     local project
     [[ -n "${python_cmd:-}" ]] || python_cmd=$(choose_python)
@@ -355,17 +396,19 @@ reference_browser() {
         section 'Reference Library'
         printf '%s\n' \
             '  1. 浏览全局条目  查看列表、详情与本地仓库状态' \
-            '  2. 查看项目 mapping  查看用途、required 与 unresolved 状态' \
-            '  3. 配置 Reference root  DryRun 预览后按 planHash 应用' \
-            '  4. 项目 mapping lifecycle  map、unmap 与 context 受控写入' \
+            '  2. 新增 reference  Public Git 或本地 clone，DryRun 后登记' \
+            '  3. 查看项目 mapping  查看用途、required 与 unresolved 状态' \
+            '  4. 配置 Reference root  DryRun 预览后按 planHash 应用' \
+            '  5. 项目 mapping lifecycle  map、unmap 与 context 受控写入' \
             '  B. 返回控制中心' \
             '  Q. 退出'
         read -r -p '请选择: ' choice
         case "${choice,,}" in
             1) if reference_list_browser; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
-            2) if reference_mapping; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
-            3) if reference_configure; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
-            4) if reference_project_actions; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
+            2) if reference_add; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
+            3) if reference_mapping; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
+            4) if reference_configure; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
+            5) if reference_project_actions; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             b) return 0 ;;
             q) return 10 ;;
             *) printf '%s\n' '无法识别输入，请使用页面显示的编号。' ;;
