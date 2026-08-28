@@ -457,6 +457,34 @@ function Invoke-ReferenceAdd {
     }
 }
 
+function Invoke-ReferenceCheckUpdate {
+    param([string]$ReferenceCli)
+
+    $referenceId = Read-AwzTuiText -Title "检查 Reference 更新" -Label "Reference id" -Hint "只查询 origin；不会修改工作树、catalog 或当前分支" -Step "HOME  ───  REFERENCE  ───  [CHECK UPDATE]" -Required -AllowBack -ExitOnQuit
+    if ($referenceId -eq "__AWZ_EXIT__") { return "exit" }
+    if ($referenceId -eq "__AWZ_BACK__") { return "back" }
+    try {
+        $result = Invoke-AwzJsonCommand -ScriptPath $ReferenceCli -Arguments @("check-update", "--id", $referenceId, "--remote") -AcceptedExitCodes @(0, 1)
+        $data = $result.data
+        $content = [System.Collections.Generic.List[string]]::new()
+        $content.Add("Reference    $($data.id)")
+        $content.Add("Status       $($data.status)")
+        $content.Add("Branch       $($data.branch)")
+        $content.Add("Worktree     $(if ($data.dirty) { 'dirty' } else { 'clean' })")
+        $content.Add("Local HEAD   $($data.head)")
+        $content.Add("Remote HEAD  $($data.remoteHead)")
+        if ($null -ne $data.behind) { $content.Add("Commits      behind $($data.behind) · ahead $($data.ahead)") }
+        $content.Add("")
+        foreach ($warning in @($result.warnings)) { $content.Add("WARN  $warning") }
+        foreach ($blocker in @($result.blockedBy)) { $content.Add("BLOCK $blocker") }
+        $subtitle = if ($result.exitCode -eq 0) { "origin 查询完成；本页不会 apply" } else { "发现更新风险；没有执行写入" }
+        return Show-AwzReadOnlyPage -Title "Reference 更新检查" -Subtitle $subtitle -Content $content.ToArray() -Step "HOME  ───  REFERENCE  ───  [CHECK UPDATE]"
+    }
+    catch {
+        return Show-AwzReadOnlyPage -Title "Reference 更新检查失败" -Subtitle "没有修改本地仓库" -Content @("✕ $($_.Exception.Message)", "", "请确认 remote 可访问后重试；本页不会执行 update。") -Step "HOME  ───  [CHECK UPDATE ERROR]"
+    }
+}
+
 function Invoke-ReferenceMapping {
     param([string]$ReferenceCli)
 
@@ -627,7 +655,8 @@ function Invoke-ReferenceBrowser {
             [pscustomobject]@{ Label = "新增 reference"; Description = "Public Git 或本地 clone；DryRun 后按 planHash 登记"; Value = "add" },
             [pscustomobject]@{ Label = "查看项目 mapping"; Description = "查看项目映射、用途、required 与 unresolved 状态"; Value = "mapping" },
             [pscustomobject]@{ Label = "配置 Reference root"; Description = "DryRun 预览后按 planHash 写入机器级配置"; Value = "configure" },
-            [pscustomobject]@{ Label = "项目 mapping lifecycle"; Description = "map、unmap 与 context 的受控写入"; Value = "project-actions" }
+            [pscustomobject]@{ Label = "项目 mapping lifecycle"; Description = "map、unmap 与 context 的受控写入"; Value = "project-actions" },
+            [pscustomobject]@{ Label = "检查 Reference 更新"; Description = "只读查询 origin；dirty/diverged 状态明确阻止 update"; Value = "check-update" }
         ) -AllowBack
         if (-not $selected) { return "exit" }
         if ($selected -eq "__AWZ_BACK__") { return "back" }
@@ -649,6 +678,10 @@ function Invoke-ReferenceBrowser {
         }
         elseif ($selected -eq "project-actions") {
             $result = Invoke-ReferenceProjectActions -ReferenceCli $ReferenceCli
+            if ($result -eq "exit") { return "exit" }
+        }
+        elseif ($selected -eq "check-update") {
+            $result = Invoke-ReferenceCheckUpdate -ReferenceCli $ReferenceCli
             if ($result -eq "exit") { return "exit" }
         }
     }

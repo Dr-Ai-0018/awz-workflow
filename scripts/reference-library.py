@@ -60,10 +60,24 @@ def emit_json_result(
     dry_run: bool,
     plan: Optional[Dict[str, Any]] = None,
     data: Optional[Dict[str, Any]] = None,
+    warnings: Optional[List[str]] = None,
+    blocked_by: Optional[List[str]] = None,
+    recovery: Optional[List[str]] = None,
 ) -> bool:
     if not getattr(args, "json_output", False):
         return False
-    print_result(operation_result(operation, exit_code, dry_run=dry_run, plan=plan, data=data))
+    print_result(
+        operation_result(
+            operation,
+            exit_code,
+            dry_run=dry_run,
+            plan=plan,
+            data=data,
+            warnings=warnings,
+            blocked_by=blocked_by,
+            recovery=recovery,
+        )
+    )
     return True
 
 
@@ -385,6 +399,143 @@ def command_show(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_check_update(args: argparse.Namespace) -> int:
+    """Inspect a reference repository and optionally compare its remote head.
+
+    The command is worktree/catalog read-only. ``--remote`` first validates the
+    branch with ``git ls-remote`` and fetches it into an AWZ-owned inspection
+    ref, so comparison never checks out, merges or rewrites user branches.
+    """
+
+    require_git()
+    reference_id = validate_reference_id(args.id)
+    config, _, _ = load_config()
+    root = library_root(config)
+    catalogs = load_catalogs(root)
+    catalog = catalogs.get(reference_id)
+    if catalog is None:
+        raise ReferenceLibraryError(f"Reference id is not registered: {reference_id}")
+    state = repository_state(root, catalog)
+    if state.get("status") in ("missing", "invalid", "error"):
+        raise ReferenceLibraryError(
+            f"Reference repository is not checkable: {reference_id}; "
+            + "; ".join(str(item) for item in state.get("issues", []))
+        )
+
+    repo_path = Path(str(state["path"]))
+    head = str(state.get("head") or run_git(["rev-parse", "HEAD"], cwd=repo_path).stdout.strip())
+    branch = str(state.get("branch") or "detached")
+    remote = str(state.get("remote") or "")
+    result_data: Dict[str, Any] = {
+        "id": reference_id,
+        "path": str(repo_path),
+        "head": head,
+        "branch": branch,
+        "remote": remote,
+        "dirty": bool(state.get("dirty")),
+        "catalogRevision": str(catalog.get("revision", "")),
+        "remoteChecked": bool(args.remote),
+        "status": "dirty" if state.get("dirty") else "up-to-date",
+    }
+    warnings: List[str] = []
+    blocked_by: List[str] = []
+    if state.get("dirty"):
+        warnings.append("repository worktree is dirty; update would be blocked until changes are reviewed")
+    if branch == "detached":
+        warnings.append("repository HEAD is detached; fast-forward update would be blocked")
+
+    if args.remote:
+        if not remote:
+            raise ReferenceLibraryError(f"Reference has no origin remote: {reference_id}")
+        if branch == "detached":
+            remote_ref = "HEAD"
+            remote_process = run_git(["ls-remote", remote, remote_ref], cwd=repo_path)
+        else:
+            remote_ref = f"refs/heads/{branch}"
+            remote_process = run_git(["ls-remote", remote, remote_ref], cwd=repo_path)
+        remote_lines = [line.split() for line in remote_process.stdout.splitlines() if line.strip()]
+        remote_head = remote_lines[0][0] if remote_lines else ""
+        if not remote_head:
+            blocked_by.append(f"remote branch is unavailable: {branch}")
+            result_data.update({"remoteRef": remote_ref, "remoteHead": None, "status": "remote-missing"})
+        else:
+            if branch == "detached":
+                result_data.update(
+                    {
+                        "remoteRef": remote_ref,
+                        "remoteHead": remote_head,
+                        "status": "detached",
+                        "relation": "unknown",
+                    }
+                )
+            else:
+                inspection_ref = f"refs/awz/check-update/{reference_id}"
+                run_git(
+                    [
+                        "fetch",
+                        "--no-tags",
+                        "--no-recurse-submodules",
+                        "origin",
+                        f"+{remote_ref}:{inspection_ref}",
+                    ],
+                    cwd=repo_path,
+                )
+                remote_head = run_git(["rev-parse", inspection_ref], cwd=repo_path).stdout.strip()
+                result_data["inspectionRef"] = inspection_ref
+                result_data.update({"remoteRef": remote_ref, "remoteHead": remote_head})
+                if remote_head == head:
+                    result_data["status"] = "up-to-date"
+                    result_data.update({"behind": 0, "ahead": 0, "relation": "equal"})
+                else:
+                    behind = int(run_git(["rev-list", "--count", f"{head}..{remote_head}"], cwd=repo_path).stdout.strip() or "0")
+                    ahead = int(run_git(["rev-list", "--count", f"{remote_head}..{head}"], cwd=repo_path).stdout.strip() or "0")
+                    if ahead == 0:
+                        relation = "fast-forward"
+                        status = "update-available"
+                    elif behind == 0:
+                        relation = "remote-behind"
+                        status = "local-ahead"
+                    else:
+                        relation = "diverged"
+                        status = "diverged"
+                    result_data.update({"behind": behind, "ahead": ahead, "relation": relation, "status": status})
+                    if relation != "fast-forward":
+                        blocked_by.append(f"remote and local history is not fast-forward compatible: {relation}")
+        if state.get("dirty"):
+            blocked_by.append("repository worktree is dirty")
+        if branch == "detached":
+            blocked_by.append("repository HEAD is detached")
+
+    exit_code = 1 if blocked_by else 0
+    if emit_json_result(
+        args,
+        "reference.check-update",
+        exit_code,
+        dry_run=False,
+        data=result_data,
+        warnings=warnings,
+        blocked_by=blocked_by,
+    ):
+        return exit_code
+    print(f"Reference: {reference_id}")
+    print(f"Repository: {repo_path}")
+    print(f"Local HEAD: {head}")
+    print(f"Branch: {branch}")
+    print(f"Worktree: {'dirty' if state.get('dirty') else 'clean'}")
+    if args.remote:
+        print(f"Remote HEAD: {result_data.get('remoteHead') or '-'}")
+        print(f"Status: {result_data['status']}")
+        if result_data.get("behind") is not None:
+            print(f"Commits: behind {result_data['behind']}, ahead {result_data['ahead']}")
+    else:
+        print("Remote: not checked (pass --remote to compare without changing the repository)")
+    for warning in warnings:
+        print(f"Warning: {warning}")
+    for blocker in blocked_by:
+        print(f"Blocked: {blocker}")
+    return exit_code
+
+
 def command_map(args: argparse.Namespace) -> int:
     reference_id = validate_reference_id(args.id)
     project = require_project(args.project)
@@ -689,6 +840,12 @@ def build_parser() -> argparse.ArgumentParser:
     show.add_argument("--id", required=True)
     add_contract_options(show)
     show.set_defaults(handler=command_show)
+
+    check_update = subparsers.add_parser("check-update", help="Compare a reference repository with its origin without changing it.")
+    check_update.add_argument("--id", required=True)
+    check_update.add_argument("--remote", action="store_true", help="Query origin with git ls-remote (read-only).")
+    add_contract_options(check_update)
+    check_update.set_defaults(handler=command_check_update)
 
     for name, handler in (("map", command_map), ("unmap", command_unmap)):
         command = subparsers.add_parser(name, help=f"{name.title()} a project reference.")

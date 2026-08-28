@@ -203,6 +203,40 @@ reference_add() {
     fi
 }
 
+reference_check_update() {
+    local reference_id
+    [[ -n "${python_cmd:-}" ]] || python_cmd=$(choose_python)
+    section '检查 Reference 更新'
+    read -r -p 'Reference id（B 返回，Q 退出）: ' reference_id
+    case "${reference_id,,}" in b) return 0 ;; q) return 10 ;; esac
+    [[ -n "$reference_id" ]] || { printf '%s\n' 'Reference id 不能为空。'; return 0; }
+    capture_json bash "$reference_cli" check-update --id "$reference_id" --remote --json
+    section 'Reference 更新检查结果'
+    if ((json_status != 0 && json_status != 1)); then
+        print_json_error
+    else
+        printf '%s' "$json_output" | "$python_cmd" -c '
+import json, sys
+result = json.load(sys.stdin)
+data = result.get("data", {})
+print("Reference    {}".format(data.get("id")))
+print("Status       {}".format(data.get("status")))
+print("Branch       {}".format(data.get("branch")))
+print("Worktree     {}".format("dirty" if data.get("dirty") else "clean"))
+print("Local HEAD   {}".format(data.get("head")))
+print("Remote HEAD  {}".format(data.get("remoteHead") or "-"))
+if data.get("behind") is not None:
+    print("Commits      behind {} · ahead {}".format(data.get("behind"), data.get("ahead")))
+for warning in result.get("warnings") or []:
+    print("WARN  {}".format(warning))
+for blocker in result.get("blockedBy") or []:
+    print("BLOCK {}".format(blocker))
+print("本页只读；不会执行 update。")
+'
+    fi
+    if wait_back_or_exit; then return 0; else return $?; fi
+}
+
 reference_mapping() {
     local project
     [[ -n "${python_cmd:-}" ]] || python_cmd=$(choose_python)
@@ -400,6 +434,7 @@ reference_browser() {
             '  3. 查看项目 mapping  查看用途、required 与 unresolved 状态' \
             '  4. 配置 Reference root  DryRun 预览后按 planHash 应用' \
             '  5. 项目 mapping lifecycle  map、unmap 与 context 受控写入' \
+            '  6. 检查 Reference 更新  只读查询 origin，不执行 update' \
             '  B. 返回控制中心' \
             '  Q. 退出'
         read -r -p '请选择: ' choice
@@ -409,6 +444,7 @@ reference_browser() {
             3) if reference_mapping; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             4) if reference_configure; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             5) if reference_project_actions; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
+            6) if reference_check_update; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             b) return 0 ;;
             q) return 10 ;;
             *) printf '%s\n' '无法识别输入，请使用页面显示的编号。' ;;

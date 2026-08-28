@@ -219,6 +219,84 @@ class ReferenceCliTransactionTests(unittest.TestCase):
             self.assertEqual(1, len(record["remaining"]))
             self.assertTrue(any("preserved repository" in item for item in record["recovery"]))
 
+    def test_check_update_reports_fast_forward_and_dirty_block(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory)
+            config_dir = fixture / "config"
+            reference_root = fixture / "references"
+            source = fixture / "source"
+            source.mkdir()
+            readme = source / "README.md"
+            readme.write_text("initial\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.email", "awz-test@example.com"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.name", "AWZ Test"], cwd=source, check=True)
+            subprocess.run(["git", "add", "README.md"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-qm", "initial"], cwd=source, check=True)
+
+            preview = self.run_cli(
+                config_dir,
+                "add",
+                "--id",
+                "update-fixture",
+                "--url",
+                str(source),
+                "--allow-local",
+                "--dry-run",
+                "--json",
+                reference_root=reference_root,
+            )
+            self.assertEqual(0, preview.returncode, preview.stderr)
+            plan_hash = json.loads(preview.stdout)["plan"]["planHash"]
+            applied = self.run_cli(
+                config_dir,
+                "add",
+                "--id",
+                "update-fixture",
+                "--url",
+                str(source),
+                "--allow-local",
+                "--json",
+                "--plan-hash",
+                plan_hash,
+                reference_root=reference_root,
+            )
+            self.assertEqual(0, applied.returncode, applied.stderr)
+
+            readme.write_text("updated upstream\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-qm", "upstream"], cwd=source, check=True)
+            checked = self.run_cli(
+                config_dir,
+                "check-update",
+                "--id",
+                "update-fixture",
+                "--remote",
+                "--json",
+                reference_root=reference_root,
+            )
+            self.assertEqual(0, checked.returncode, checked.stderr)
+            data = json.loads(checked.stdout)["data"]
+            self.assertEqual("update-available", data["status"])
+            self.assertEqual("fast-forward", data["relation"])
+            self.assertEqual(1, data["behind"])
+            self.assertFalse(data["dirty"])
+
+            destination = reference_root / "repos" / "general" / "update-fixture"
+            (destination / "local.txt").write_text("dirty\n", encoding="utf-8")
+            dirty = self.run_cli(
+                config_dir,
+                "check-update",
+                "--id",
+                "update-fixture",
+                "--remote",
+                "--json",
+                reference_root=reference_root,
+            )
+            self.assertEqual(1, dirty.returncode)
+            dirty_result = json.loads(dirty.stdout)
+            self.assertIn("repository worktree is dirty", dirty_result["blockedBy"])
+
 
 if __name__ == "__main__":
     unittest.main()
