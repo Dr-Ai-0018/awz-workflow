@@ -1,22 +1,33 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-
+from unittest import mock
 
 SCRIPT_ROOT = Path(__file__).resolve().parents[1]
+if str(SCRIPT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_ROOT))
+
 CLI = SCRIPT_ROOT / "reference-library.py"
 
 
 class ReferenceCliTransactionTests(unittest.TestCase):
-    def run_cli(self, config_dir: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+    def run_cli(
+        self,
+        config_dir: Path,
+        *arguments: str,
+        reference_root: Path | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         environment = os.environ.copy()
         environment["AWZ_CONFIG_DIR"] = str(config_dir)
+        if reference_root is not None:
+            environment["AWZ_REFERENCE_ROOT"] = str(reference_root)
         environment["PYTHONUTF8"] = "1"
         return subprocess.run(
             [sys.executable, str(CLI), *arguments],
@@ -83,6 +94,130 @@ class ReferenceCliTransactionTests(unittest.TestCase):
             self.assertEqual(2, len(record["completed"]))
             self.assertEqual([], record["remaining"])
             self.assertTrue((config_dir / "config.json").is_file())
+
+    def test_add_local_fixture_requires_preview_and_records_transaction(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory)
+            config_dir = fixture / "config"
+            reference_root = fixture / "references"
+            source = fixture / "source"
+            source.mkdir()
+            (source / "README.md").write_text("offline fixture\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.email", "awz-test@example.com"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.name", "AWZ Test"], cwd=source, check=True)
+            subprocess.run(["git", "add", "README.md"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-qm", "fixture"], cwd=source, check=True)
+
+            preview = self.run_cli(
+                config_dir,
+                "add",
+                "--id",
+                "offline-fixture",
+                "--url",
+                str(source),
+                "--allow-local",
+                "--dry-run",
+                "--json",
+                reference_root=reference_root,
+            )
+            self.assertEqual(0, preview.returncode, preview.stderr)
+            preview_result = json.loads(preview.stdout)
+            self.assertTrue(preview_result["dryRun"])
+            self.assertEqual("reference.add", preview_result["operation"])
+            plan_hash = preview_result["plan"]["planHash"]
+            destination = Path(preview_result["data"]["destination"])
+            self.assertFalse(destination.exists())
+            self.assertFalse(reference_root.exists())
+
+            applied = self.run_cli(
+                config_dir,
+                "add",
+                "--id",
+                "offline-fixture",
+                "--url",
+                str(source),
+                "--allow-local",
+                "--json",
+                "--plan-hash",
+                plan_hash,
+                reference_root=reference_root,
+            )
+            self.assertEqual(0, applied.returncode, applied.stderr)
+            applied_result = json.loads(applied.stdout)
+            self.assertEqual("completed", applied_result["data"]["transaction"]["state"])
+            self.assertTrue(destination.is_dir())
+            catalog = reference_root / "catalog" / "offline-fixture.json"
+            self.assertTrue(catalog.is_file())
+            self.assertEqual("offline-fixture", json.loads(catalog.read_text(encoding="utf-8"))["id"])
+
+            duplicate = self.run_cli(
+                config_dir,
+                "add",
+                "--id",
+                "offline-fixture",
+                "--url",
+                str(source),
+                "--allow-local",
+                "--dry-run",
+                "--json",
+                reference_root=reference_root,
+            )
+            self.assertEqual(1, duplicate.returncode)
+            self.assertTrue(json.loads(duplicate.stdout)["blockedBy"])
+
+    def test_add_preserves_clone_when_catalog_write_fails(self) -> None:
+        spec = importlib.util.spec_from_file_location("awz_reference_cli", CLI)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory)
+            config_dir = fixture / "config"
+            reference_root = fixture / "references"
+            source = fixture / "source"
+            source.mkdir()
+            (source / "README.md").write_text("offline fixture\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.email", "awz-test@example.com"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.name", "AWZ Test"], cwd=source, check=True)
+            subprocess.run(["git", "add", "README.md"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-qm", "fixture"], cwd=source, check=True)
+            args = type("Args", (), {
+                "id": "broken-fixture",
+                "name": None,
+                "url": str(source),
+                "category": "general",
+                "depth": 1,
+                "tag": None,
+                "read_first": None,
+                "use_when": None,
+                "avoid_when": None,
+                "license_url": None,
+                "canonical_url": None,
+                "allow_local": True,
+                "dry_run": False,
+                "json_output": False,
+                "plan_hash": None,
+            })()
+
+            with mock.patch.dict(os.environ, {"AWZ_CONFIG_DIR": str(config_dir), "AWZ_REFERENCE_ROOT": str(reference_root)}, clear=False):
+                with mock.patch.object(cli, "write_json_atomic", side_effect=OSError("catalog fixture failure")):
+                    with self.assertRaises(cli.ReferenceLibraryError) as raised:
+                        cli.command_add(args)
+
+            self.assertIn("clone was preserved", str(raised.exception))
+            destination = reference_root / "repos" / "general" / "broken-fixture"
+            self.assertTrue(destination.is_dir())
+            transaction_files = list((reference_root / "logs" / "transactions").glob("*.json"))
+            self.assertEqual(1, len(transaction_files))
+            record = json.loads(transaction_files[0].read_text(encoding="utf-8"))
+            self.assertEqual("failed", record["state"])
+            self.assertEqual(2, len(record["completed"]))
+            self.assertEqual(1, len(record["remaining"]))
+            self.assertTrue(any("preserved repository" in item for item in record["recovery"]))
 
 
 if __name__ == "__main__":
