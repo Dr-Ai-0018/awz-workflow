@@ -75,7 +75,7 @@ wait_back_or_exit() {
     done
 }
 
-reference_browser() {
+reference_list_browser() {
     local -a reference_ids=()
     local choice index reference_id
     [[ -n "${python_cmd:-}" ]] || python_cmd=$(choose_python)
@@ -151,6 +151,71 @@ for label, value in rows:
         else
             return $?
         fi
+    done
+}
+
+reference_mapping() {
+    local project
+    [[ -n "${python_cmd:-}" ]] || python_cmd=$(choose_python)
+    section '项目 Reference mapping'
+    printf '%s\n' '读取 .awz/references.json；本页只读，不会修改 mapping 或 context。'
+    read -r -p '项目目录（B 返回，Q 退出）: ' project
+    case "${project,,}" in
+        b) return 0 ;;
+        q) return 10 ;;
+    esac
+    [[ -n "$project" ]] || { printf '%s\n' '项目目录不能为空。'; return 0; }
+    capture_json bash "$reference_cli" status --project "$project" --json
+    section '项目 Reference mapping 结果'
+    if ((json_status != 0 && json_status != 1)); then
+        print_json_error
+    else
+        printf '%s' "$json_output" | "$python_cmd" -c '
+import json, sys
+result = json.load(sys.stdin)
+data = result.get("data", {})
+entries = data.get("projectMappingEntries") or []
+unresolved = data.get("unresolved") or []
+print("项目      {}".format(sys.argv[1]))
+print("映射      {} · unresolved {}".format(len(entries), len(unresolved)))
+if not entries:
+    print("当前项目没有映射 Reference。")
+for entry in entries:
+    required = "required" if entry.get("required") else "optional"
+    print("{}  {}  [{}]".format(str(entry.get("status", "unknown")).upper(), entry.get("id", "<invalid>"), required))
+    if entry.get("purpose"):
+        print("    用途：{}".format(entry["purpose"]))
+    if entry.get("path"):
+        print("    路径：{}".format(entry["path"]))
+    for issue in (entry.get("issues") or [])[:1]:
+        print("    ! {}".format(issue))
+if unresolved:
+    print("发现 unresolved mapping；本页不会自动修复。")
+else:
+    print("只读项目映射状态。")
+' "$project"
+    fi
+    printf '%s\n' '本页只读；不会修改 mapping 或 context。'
+    if wait_back_or_exit; then return 0; else return $?; fi
+}
+
+reference_browser() {
+    local choice status
+    while true; do
+        section 'Reference Library'
+        printf '%s\n' \
+            '  1. 浏览全局条目  查看列表、详情与本地仓库状态' \
+            '  2. 查看项目 mapping  查看用途、required 与 unresolved 状态' \
+            '  B. 返回控制中心' \
+            '  Q. 退出'
+        read -r -p '请选择: ' choice
+        case "${choice,,}" in
+            1) if reference_list_browser; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
+            2) if reference_mapping; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
+            b) return 0 ;;
+            q) return 10 ;;
+            *) printf '%s\n' '无法识别输入，请使用页面显示的编号。' ;;
+        esac
     done
 }
 

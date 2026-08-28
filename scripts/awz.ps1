@@ -297,7 +297,7 @@ function Show-AwzReadOnlyPage {
     }
 }
 
-function Invoke-ReferenceBrowser {
+function Invoke-ReferenceListBrowser {
     param([string]$ReferenceCli)
 
     try {
@@ -357,6 +357,65 @@ function Invoke-ReferenceBrowser {
             "",
             "没有执行任何 Reference Library 写操作。"
         ) -Step "HOME  ───  [REFERENCE ERROR]"
+    }
+}
+
+function Invoke-ReferenceMapping {
+    param([string]$ReferenceCli)
+
+    $project = Read-AwzTuiText -Title "项目 Reference mapping" -Label "项目目录" -Hint "读取 .awz/references.json；本页只读，不会修改 mapping 或 context" -Step "HOME  ───  REFERENCE  ───  [PROJECT MAPPING]" -Required -AllowBack -ExitOnQuit
+    if ($project -eq "__AWZ_BACK__") { return "back" }
+    if ($project -eq "__AWZ_EXIT__") { return "exit" }
+    try {
+        $result = Invoke-AwzJsonCommand -ScriptPath $ReferenceCli -Arguments @("status", "--project", $project) -AcceptedExitCodes @(0, 1)
+        $data = $result.data
+        $entries = @($data.projectMappingEntries)
+        $content = [System.Collections.Generic.List[string]]::new()
+        $content.Add("项目      $project")
+        $content.Add("映射      $($entries.Count) · unresolved $(@($data.unresolved).Count)")
+        $content.Add("")
+        if ($entries.Count -eq 0) {
+            $content.Add("当前项目没有映射 Reference。")
+        }
+        foreach ($entry in $entries) {
+            $required = if ($entry.required) { "required" } else { "optional" }
+            $content.Add("$($entry.status.ToUpper())  $($entry.id)  [$required]")
+            if ($entry.purpose) { $content.Add("    用途：$($entry.purpose)") }
+            if ($entry.path) { $content.Add("    路径：$($entry.path)") }
+            foreach ($issue in (@($entry.issues) | Select-Object -First 1)) {
+                $content.Add("    ! $issue")
+            }
+        }
+        $subtitle = if (@($data.unresolved).Count -gt 0) { "发现 unresolved mapping；本页不会自动修复" } else { "只读项目映射状态" }
+        return Show-AwzReadOnlyPage -Title "项目 Reference mapping" -Subtitle $subtitle -Content $content.ToArray() -Step "HOME  ───  REFERENCE  ───  [PROJECT MAPPING]"
+    }
+    catch {
+        return Show-AwzReadOnlyPage -Title "项目 mapping 不可用" -Subtitle "只读命令返回错误" -Content @(
+            "✕ $($_.Exception.Message)",
+            "",
+            "没有执行任何 mapping 或 context 写操作。"
+        ) -Step "HOME  ───  [MAPPING ERROR]"
+    }
+}
+
+function Invoke-ReferenceBrowser {
+    param([string]$ReferenceCli)
+
+    while ($true) {
+        $selected = Select-AwzTuiOption -Title "Reference Library" -Subtitle "全局条目与项目 mapping（只读）" -Step "HOME  ───  [REFERENCE CENTER]" -Options @(
+            [pscustomobject]@{ Label = "浏览全局条目"; Description = "查看 reference 列表、详情与本地仓库状态"; Value = "list" },
+            [pscustomobject]@{ Label = "查看项目 mapping"; Description = "查看项目映射、用途、required 与 unresolved 状态"; Value = "mapping" }
+        ) -AllowBack
+        if (-not $selected) { return "exit" }
+        if ($selected -eq "__AWZ_BACK__") { return "back" }
+        if ($selected -eq "list") {
+            $result = Invoke-ReferenceListBrowser -ReferenceCli $ReferenceCli
+            if ($result -eq "exit") { return "exit" }
+        }
+        elseif ($selected -eq "mapping") {
+            $result = Invoke-ReferenceMapping -ReferenceCli $ReferenceCli
+            if ($result -eq "exit") { return "exit" }
+        }
     }
 }
 

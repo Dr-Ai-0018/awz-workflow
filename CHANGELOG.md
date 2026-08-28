@@ -18,7 +18,7 @@
 - Reference Library transaction 与 JSON apply contract 的无网络隔离测试。
 - 基于本地 manifest 的独立项目 `refresh`：逐文件 ownership/hash 分类、stale plan 拒绝、冲突整体阻止和覆盖前备份。
 - Windows/POSIX refresh 包装器、隔离 fixture 与跨平台 smoke。
-- Windows/POSIX AWZ 控制中心主菜单，以及结构化 Reference 列表/详情、只读 Doctor 和 refresh DryRun 页面。
+- Windows/POSIX AWZ 控制中心主菜单，以及结构化 Reference 列表/详情、项目 mapping、只读 Doctor 和 refresh DryRun 页面。
 - 初始化项目新增统一的 `docs/references/` 背景与资料入口，Reference Library context 同目录生成。
 - Agent 协作规则支持单 Agent、双 Agent、三 Agent 与四个以上团队按实际 model/harness 能力动态选择策略。
 - 以语义边界触发的阶段收口与恢复链，不依赖 token 阈值或 Harness compaction。

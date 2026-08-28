@@ -569,19 +569,51 @@ def command_status(args: argparse.Namespace, strict: bool) -> int:
 
     mapped_ids = []
     unresolved = []
+    project_mapping_entries = []
     if args.project:
         project = require_project(args.project)
         mapping = load_project_mapping(project)
         for entry in mapping["references"]:
             if not isinstance(entry, dict):
                 has_errors = True
+                project_mapping_entries.append({
+                    "id": "<invalid>",
+                    "purpose": "",
+                    "required": False,
+                    "notes": "",
+                    "status": "invalid",
+                    "path": "<invalid>",
+                    "issues": ["mapping entry must be an object"],
+                })
                 continue
             reference_id = str(entry.get("id", ""))
             mapped_ids.append(reference_id)
-            if reference_id not in catalogs:
+            catalog = catalogs.get(reference_id)
+            mapping_state = {
+                "id": reference_id,
+                "purpose": str(entry.get("purpose", "")),
+                "required": bool(entry.get("required")),
+                "notes": str(entry.get("notes", "")),
+            }
+            if catalog is None:
+                mapping_state.update({
+                    "status": "unresolved",
+                    "path": "<unresolved>",
+                    "issues": ["reference catalog is not registered"],
+                })
                 unresolved.append(reference_id)
                 if entry.get("required") or strict:
                     has_errors = True
+            else:
+                state = repository_state(root, catalog)
+                mapping_state.update({
+                    "status": state.get("status", "unknown"),
+                    "path": state.get("path", "<unknown>"),
+                    "issues": list(state.get("issues", [])),
+                })
+                if entry.get("required") and state.get("status") in ("missing", "invalid", "error"):
+                    has_errors = True
+            project_mapping_entries.append(mapping_state)
     exit_code = 1 if strict and has_errors else 0
     if emit_json_result(
         args,
@@ -595,6 +627,7 @@ def command_status(args: argparse.Namespace, strict: bool) -> int:
             "rootExists": root.is_dir(),
             "references": rows,
             "projectMappings": mapped_ids,
+            "projectMappingEntries": project_mapping_entries,
             "unresolved": unresolved,
         },
     ):

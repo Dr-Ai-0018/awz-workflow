@@ -13,6 +13,7 @@ dryrun_path="$root/temp/smoke-tui-dryrun-${RANDOM}-${RANDOM}"
 apply_path="$root/temp/smoke-tui-apply-${RANDOM}-${RANDOM}"
 occupied_path="$root/temp/smoke-tui-occupied-${RANDOM}-${RANDOM}"
 read_only_path="$root/temp/smoke-tui-readonly-${RANDOM}-${RANDOM}"
+mapping_project="$read_only_path/mapping-project"
 keep_artifacts=false
 
 if [[ "${1:-}" == '--keep-artifacts' ]]; then
@@ -43,12 +44,27 @@ bash "$tui" --action init --target "$apply_path" --name 'AWZ TUI Apply' --yes
 [[ -f "$apply_path/README.md" ]] || die 'TUI apply did not write README'
 
 mkdir -p "$read_only_path/config" "$read_only_path/references"
+mkdir -p "$mapping_project/.awz"
+printf '%s\n' '{"schemaVersion":1,"references":[{"id":"missing-fixture","purpose":"smoke mapping","required":true,"notes":""}]}' > "$mapping_project/.awz/references.json"
+mapping_status=$(AWZ_CONFIG_DIR="$read_only_path/config" AWZ_REFERENCE_ROOT="$read_only_path/references" bash "$script_dir/reference-library.sh" status --project "$mapping_project" --json)
+[[ "$mapping_status" == *'"projectMappingEntries"'* ]] || die 'Project mapping status omitted structured entries'
+[[ "$mapping_status" == *'"status": "unresolved"'* ]] || die 'Project mapping did not report unresolved status'
+
 reference_output=$(
-    printf '3\nb\nq\n' |
+    printf '3\n1\nb\nb\nq\n' |
         AWZ_CONFIG_DIR="$read_only_path/config" AWZ_REFERENCE_ROOT="$read_only_path/references" bash "$tui"
 )
 [[ "$reference_output" == *'Reference Library'* ]] || die 'Reference Library view did not open'
 [[ "$reference_output" == *'尚未登记 reference'* ]] || die 'Reference Library did not use the isolated structured result'
+
+mapping_output=$(
+    printf '3\n2\n%s\nb\nb\nq\n' "$mapping_project" |
+        AWZ_CONFIG_DIR="$read_only_path/config" AWZ_REFERENCE_ROOT="$read_only_path/references" bash "$tui"
+)
+[[ "$mapping_output" == *'项目 Reference mapping 结果'* ]] || die 'Project mapping view did not open'
+[[ "$mapping_output" == *'UNRESOLVED'* ]] || die 'Project mapping view omitted unresolved status'
+[[ "$mapping_output" == *'smoke mapping'* ]] || die 'Project mapping view omitted purpose'
+[[ ! -e "$mapping_project/docs/references/reference-context.md" ]] || die 'Project mapping view generated context'
 
 doctor_output=$(
     printf '5\nb\nq\n' |

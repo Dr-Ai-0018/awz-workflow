@@ -15,6 +15,7 @@ $batchDryRunPath = Join-Path $root ("temp/smoke-tui-bat-" + [guid]::NewGuid().To
 $applyPath = Join-Path $root ("temp/smoke-tui-apply-" + [guid]::NewGuid().ToString("N"))
 $occupiedPath = Join-Path $root ("temp/smoke-tui-occupied-" + [guid]::NewGuid().ToString("N"))
 $readOnlyFixture = Join-Path $root ("temp/smoke-tui-readonly-" + [guid]::NewGuid().ToString("N"))
+$mappingProject = Join-Path $readOnlyFixture "mapping-project"
 $previousConfigDir = $env:AWZ_CONFIG_DIR
 $previousReferenceRoot = $env:AWZ_REFERENCE_ROOT
 
@@ -40,6 +41,7 @@ try {
     Assert-True $tuiModuleSource.Contains('Start-Sleep -Seconds $PauseSeconds') "Activity logs must remain visible before the next view replaces them"
     Assert-True $tuiSource.Contains("function Invoke-AwzJsonCommand") "Control center must consume structured command results"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceBrowser") "Control center is missing the Reference Library browser"
+    Assert-True $tuiSource.Contains("function Invoke-ReferenceMapping") "Control center is missing the project mapping view"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceDoctor") "Control center is missing Doctor"
     Assert-True $tuiSource.Contains("function Invoke-RefreshCheck") "Control center is missing the safe refresh check"
 
@@ -83,6 +85,16 @@ try {
     $doctorResult = $doctorText | ConvertFrom-Json
     Assert-True ($doctorResult.operation -eq "reference.doctor") "Doctor returned the wrong operation contract"
     Assert-True ($doctorResult.data.referenceRoot -eq $referenceRoot) "Doctor escaped the isolated reference root"
+
+    New-Item -ItemType Directory -Path (Join-Path $mappingProject ".awz") -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $mappingProject ".awz/references.json") -Value '{"schemaVersion":1,"references":[{"id":"missing-fixture","purpose":"smoke mapping","required":true,"notes":""}]}' -Encoding UTF8
+    $mappingText = @(& $referenceCli status --project $mappingProject --json) -join "`n"
+    Assert-True ($LASTEXITCODE -eq 0) "Structured project mapping status failed"
+    $mappingResult = $mappingText | ConvertFrom-Json
+    Assert-True ($mappingResult.data.projectMappingEntries.Count -eq 1) "Project mapping entry was not exposed"
+    Assert-True ($mappingResult.data.projectMappingEntries[0].status -eq "unresolved") "Unresolved project mapping status changed"
+    Assert-True ($mappingResult.data.projectMappingEntries[0].purpose -eq "smoke mapping") "Project mapping purpose was lost"
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $mappingProject "docs/references/reference-context.md"))) "Mapping status generated context"
 
     $missingReferenceRoot = Join-Path $readOnlyFixture "missing-references"
     $env:AWZ_REFERENCE_ROOT = $missingReferenceRoot

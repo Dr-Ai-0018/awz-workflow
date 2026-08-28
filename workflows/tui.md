@@ -38,12 +38,12 @@ Windows 与 POSIX 默认主菜单语义一致：
 
 1. `创建新项目`：进入 New 初始化子流程；
 2. `接入已有项目`：进入 Existing 初始化子流程；
-3. `Reference Library`：读取结构化 JSON，展示条目列表、详情和本地 repo 状态；
+3. `Reference Library`：读取结构化 JSON，展示全局条目列表、详情、本地 repo 状态和项目 mapping；
 4. `安全刷新检查`：要求项目路径，只运行 `refresh --dry-run --json`；
 5. `Doctor`：展示 reference root、配置来源、条目状态和离线问题；
 6. `Q`：退出控制中心；子页面使用 `B` 返回。
 
-当前控制中心的 Reference 与 Doctor 页面只读，refresh 页面不会提供 apply。配置、add、map/unmap、context、update、trash/restore/purge 等写操作必须等结构化预览、分级确认和恢复界面完成后再接入；在此之前继续使用 CLI，不得把少量只读页面称为完整 Reference 生命周期 TUI。
+当前控制中心的 Reference、项目 mapping 与 Doctor 页面只读，refresh 页面不会提供 apply。配置、add、map/unmap、context、update、trash/restore/purge 等写操作必须等结构化预览、分级确认和恢复界面完成后再接入；在此之前继续使用 CLI，不得把少量只读页面称为完整 Reference 生命周期 TUI。
 
 ## Windows 初始化子流程
 
@@ -71,7 +71,7 @@ Windows 与 POSIX 默认主菜单语义一致：
 .\scripts\awz.ps1 -RenderDemo
 ```
 
-POSIX `awz.sh` 已对齐五项主菜单、Reference 列表/详情、Doctor 与 refresh DryRun 语义；初始化仍使用行式引导，不在两种 shell 中复制底层业务逻辑，也不把逐键全屏重绘作为目标。
+POSIX `awz.sh` 已对齐五项主菜单、Reference 全局列表/详情、项目 mapping、Doctor 与 refresh DryRun 语义；初始化仍使用行式引导，不在两种 shell 中复制底层业务逻辑，也不把逐键全屏重绘作为目标。
 
 ## 安全不变量
 
@@ -142,6 +142,7 @@ bash scripts/smoke-awz-tui.sh
 - Windows BAT 参数转发可用；
 - Windows 控制中心 frame 包含五项入口、完整边框、步骤栏、编号选择与明确输入提示；
 - 两端使用隔离配置验证 Reference list、Doctor 和 refresh DryRun，且不接触真实 Reference Library、不生成 refresh manifest；
+- 两端使用隔离项目验证项目 mapping 的 mapped/unresolved、purpose 和 required 状态，且不生成 context；
 - 测试结束后没有临时残留。
 
 ## 后续演进
