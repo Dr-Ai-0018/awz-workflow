@@ -283,22 +283,25 @@ print("输入 A 应用；B 返回；Q 退出。")
 }
 
 reference_removal() {
-    local action reference_id token status
+    local action identifier token status label
     [[ -n "${python_cmd:-}" ]] || python_cmd=$(choose_python)
     section 'Reference 登记生命周期'
-    printf '%s\n' '  1. 取消登记       移除 catalog，保留 clone' '  2. 移入 trash      repo/catalog 一起移动，可恢复' '  B. 返回' '  Q. 退出'
+    printf '%s\n' '  1. 取消登记       移除 catalog，保留 clone' '  2. 移入 trash      repo/catalog 一起移动，可恢复' '  3. 从 trash 恢复  目标存在时拒绝覆盖' '  B. 返回' '  Q. 退出'
     read -r -p '选择操作: ' action
     case "${action,,}" in
-        1) action='unregister'; token='UNREGISTER' ;;
-        2) action='trash'; token='TRASH' ;;
+        1) action='unregister'; token='UNREGISTER'; label='Reference id' ;;
+        2) action='trash'; token='TRASH'; label='Reference id' ;;
+        3) action='restore'; token='RESTORE'; label='Trash id' ;;
         b) return 0 ;;
         q) return 10 ;;
-        *) printf '%s\n' '无法识别输入，请使用 1、2、B 或 Q。'; return 0 ;;
+        *) printf '%s\n' '无法识别输入，请使用 1、2、3、B 或 Q。'; return 0 ;;
     esac
-    read -r -p 'Reference id（B 返回，Q 退出）: ' reference_id
-    case "${reference_id,,}" in b) return 0 ;; q) return 10 ;; esac
-    [[ -n "$reference_id" ]] || { printf '%s\n' 'Reference id 不能为空。'; return 0; }
-    if reference_write_preview "$token $reference_id" "$token" "$action" --id "$reference_id"; then
+    read -r -p "$label（B 返回，Q 退出）: " identifier
+    case "${identifier,,}" in b) return 0 ;; q) return 10 ;; esac
+    [[ -n "$identifier" ]] || { printf '%s\n' "$label 不能为空。"; return 0; }
+    local -a removal_args=("$action")
+    if [[ "$action" == 'restore' ]]; then removal_args+=(--trash-id "$identifier"); else removal_args+=(--id "$identifier"); fi
+    if reference_write_preview "$token $identifier" "$token" "${removal_args[@]}"; then
         status=0
     else
         status=$?

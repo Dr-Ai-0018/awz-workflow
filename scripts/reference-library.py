@@ -46,7 +46,7 @@ from reference_library.projects import (
     require_project,
     resolve_context_output,
 )
-from reference_library.storage import write_json_atomic, write_text_atomic
+from reference_library.storage import read_json, write_json_atomic, write_text_atomic
 from reference_library.transactions import ReferenceTransaction
 
 
@@ -869,6 +869,132 @@ def command_trash(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_restore(args: argparse.Namespace) -> int:
+    trash_id = str(args.trash_id).strip()
+    if not trash_id or trash_id in (".", "..") or any(separator in trash_id for separator in ("/", "\\")):
+        raise ReferenceLibraryError("Trash id must be one safe directory name without path separators.")
+    config, _, _ = load_config()
+    root = library_root(config)
+    trash_root = require_within(root / "trash", root, "Trash root")
+    trash_dir = require_within(trash_root / trash_id, trash_root, "Trash entry")
+    manifest_path = require_within(trash_dir / "manifest.json", trash_dir, "Trash manifest")
+    manifest = read_json(manifest_path, "trash manifest")
+    if manifest.get("schemaVersion") != 1 or manifest.get("state") != "trashed":
+        raise ReferenceLibraryError(f"Trash manifest is not restorable: {manifest_path}")
+    reference_id = validate_reference_id(str(manifest.get("id", "")))
+    original = manifest.get("original")
+    if not isinstance(original, dict):
+        raise ReferenceLibraryError(f"Trash manifest has no original paths: {manifest_path}")
+    catalog_snapshot = manifest.get("catalog")
+    if not isinstance(catalog_snapshot, dict):
+        raise ReferenceLibraryError(f"Trash manifest has no catalog snapshot: {manifest_path}")
+    catalog_reference_id = validate_reference_id(str(catalog_snapshot.get("id", "")))
+    if catalog_reference_id != reference_id:
+        raise ReferenceLibraryError(f"Trash manifest id does not match its catalog snapshot: {manifest_path}")
+
+    def restore_target(value: Any, label: str) -> Path:
+        if not isinstance(value, str) or not value.strip():
+            raise ReferenceLibraryError(f"Trash manifest {label} path is missing: {manifest_path}")
+        relative = Path(value)
+        if relative.is_absolute() or any(part in ("", ".", "..") for part in relative.parts):
+            raise ReferenceLibraryError(f"Unsafe {label} path in trash manifest: {value}")
+        return require_within(root / relative, root, f"Restore {label} target")
+
+    catalog_target = restore_target(original.get("catalog"), "catalog")
+    repo_target = restore_target(original.get("repository"), "repository")
+    expected_catalog_target = catalog_path(root, reference_id)
+    repositories_root = require_within(root / "repos", root, "Repository root")
+    expected_repo_target = require_within(
+        repo_path_from_catalog(root, catalog_snapshot), repositories_root, "Catalog repository target"
+    )
+    if expected_repo_target.name != reference_id:
+        raise ReferenceLibraryError(f"Catalog repository target does not match reference id: {expected_repo_target}")
+    if catalog_target != expected_catalog_target or repo_target != expected_repo_target:
+        raise ReferenceLibraryError(
+            f"Trash manifest original paths do not match canonical targets for {reference_id}: {manifest_path}"
+        )
+    trash_repo = require_within(trash_dir / "repo", trash_dir, "Trashed repository")
+    trash_catalog = require_within(trash_dir / "catalog.json", trash_dir, "Trashed catalog")
+    history_path = require_within(root / "logs" / "restores" / f"{trash_id}.json", root, "Restore history")
+    blocked_by: List[str] = []
+    if catalog_target.exists():
+        blocked_by.append(f"restore catalog target already exists: {catalog_target}")
+    if repo_target.exists():
+        blocked_by.append(f"restore repository target already exists: {repo_target}")
+    if history_path.exists():
+        blocked_by.append(f"restore history already exists: {history_path}")
+    if not trash_repo.is_dir():
+        blocked_by.append(f"trashed repository is missing: {trash_repo}")
+    if not trash_catalog.is_file():
+        blocked_by.append(f"trashed catalog is missing: {trash_catalog}")
+    elif read_json(trash_catalog, "trashed catalog") != catalog_snapshot:
+        blocked_by.append(f"trashed catalog does not match the manifest snapshot: {trash_catalog}")
+    allowed_names = {"repo", "catalog.json", "manifest.json"}
+    unknown_entries = [item.name for item in trash_dir.iterdir() if item.name not in allowed_names]
+    if unknown_entries:
+        blocked_by.append("trash entry contains unknown files: " + ", ".join(sorted(unknown_entries)))
+    archived_manifest = {
+        **manifest,
+        "state": "restored",
+        "restoredAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "restoreTargets": {"catalog": str(catalog_target), "repository": str(repo_target)},
+    }
+    plan = write_plan(
+        "reference.restore",
+        [
+            {"kind": "move-repository", "target": str(repo_target), "summary": "恢复 reference clone 到原路径"},
+            {"kind": "move-catalog", "target": str(catalog_target), "summary": "恢复 catalog 到原路径"},
+            {"kind": "write-manifest", "target": str(history_path), "summary": "归档 restored manifest"},
+            {"kind": "remove-empty-trash", "target": str(trash_dir), "summary": "移除已恢复的空 trash 目录"},
+        ],
+        [trash_repo, trash_catalog, manifest_path, catalog_target, repo_target, history_path],
+        {"trashId": trash_id, "id": reference_id, "catalogTarget": str(catalog_target), "repositoryTarget": str(repo_target)},
+        blocked_by=blocked_by,
+        recovery=[
+            f"Inspect the trash manifest at {manifest_path} and restore history at {history_path}.",
+            "Never overwrite existing catalog or repository targets; resolve conflicts and re-run restore --dry-run.",
+        ],
+    )
+    if args.dry_run:
+        exit_code = 1 if blocked_by else 0
+        if emit_json_result(args, "reference.restore", exit_code, dry_run=True, plan=plan, data={"trashId": trash_id, "id": reference_id, "catalog": str(catalog_target), "repository": str(repo_target)}):
+            return exit_code
+        print(f"Trash id: {trash_id}")
+        print(f"Repository target: {repo_target}")
+        print(f"Catalog target: {catalog_target}")
+        for blocker in blocked_by:
+            print(f"Blocked: {blocker}")
+        return exit_code
+    if blocked_by:
+        raise ReferenceLibraryError("Restore blocked: " + "; ".join(blocked_by), recovery=plan["recovery"])
+    validate_apply_plan(args, plan)
+    transaction = start_transaction(root, "reference.restore", plan)
+    try:
+        transaction.begin_apply()
+        repo_target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(trash_repo), str(repo_target))
+        transaction.complete_action(0)
+        catalog_target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(trash_catalog), str(catalog_target))
+        transaction.complete_action(1)
+        write_json_atomic(history_path, archived_manifest)
+        transaction.complete_action(2)
+        manifest_path.unlink()
+        trash_dir.rmdir()
+        transaction.complete_action(3)
+        transaction.complete()
+    except Exception as exc:
+        raise_transaction_failure(transaction, exc, [f"Review transaction record at {transaction.path}.", f"Inspect restore history at {history_path} and the original targets.", "Do not overwrite, reset or delete any partially restored repository."])
+    data = transaction_data({"trashId": trash_id, "id": reference_id, "catalog": str(catalog_target), "repository": str(repo_target), "history": str(history_path)}, transaction)
+    if emit_json_result(args, "reference.restore", 0, dry_run=False, plan=plan, data=data):
+        return 0
+    print(f"Restored reference {reference_id}: {repo_target}")
+    print(f"Catalog: {catalog_target}")
+    print(f"Restore history: {history_path}")
+    print(f"Transaction: {transaction.path}")
+    return 0
+
+
 def command_map(args: argparse.Namespace) -> int:
     reference_id = validate_reference_id(args.id)
     project = require_project(args.project)
@@ -1192,6 +1318,12 @@ def build_parser() -> argparse.ArgumentParser:
         lifecycle.add_argument("--dry-run", action="store_true")
         add_contract_options(lifecycle, writable=True)
         lifecycle.set_defaults(handler=handler)
+
+    restore = subparsers.add_parser("restore", help="Restore one trash entry without overwriting existing targets.")
+    restore.add_argument("--trash-id", required=True)
+    restore.add_argument("--dry-run", action="store_true")
+    add_contract_options(restore, writable=True)
+    restore.set_defaults(handler=command_restore)
 
     for name, handler in (("map", command_map), ("unmap", command_unmap)):
         command = subparsers.add_parser(name, help=f"{name.title()} a project reference.")

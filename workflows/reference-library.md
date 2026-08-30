@@ -23,7 +23,8 @@ AWZ References/
 ├─ catalog/          # 一项目一份 JSON metadata
 ├─ repos/            # 第三方 Git clone
 ├─ context-cache/    # 可再生成的 AI 摘要
-└─ logs/             # 本地操作日志，不进入业务项目
+├─ trash/            # 可恢复删除条目，包含 repo、catalog 与 manifest
+└─ logs/             # transaction 与 restore 历史，不进入业务项目
 ```
 
 机器级配置位于：
@@ -69,6 +70,8 @@ Windows：
 .\scripts\reference-library.ps1 add --id gsap --url https://github.com/greensock/GSAP.git --category frontend --dry-run
 .\scripts\reference-library.ps1 list
 .\scripts\reference-library.ps1 show --id gsap
+.\scripts\reference-library.ps1 check-update --id gsap --remote
+.\scripts\reference-library.ps1 update --id gsap --dry-run
 .\scripts\reference-library.ps1 map --project 'E:\Project\Example' --id gsap --purpose '前端交互动效参考'
 .\scripts\reference-library.ps1 context --project 'E:\Project\Example'
 .\scripts\reference-library.ps1 status --project 'E:\Project\Example'
@@ -82,7 +85,7 @@ bash scripts/reference-library.sh configure --root "$HOME/AWZ References" --dry-
 bash scripts/reference-library.sh list
 ```
 
-当前核心支持 `configure`、`add`、`list`、`show`、`check-update`、`update`、`unregister`、`trash`、`status`、`map`、`unmap`、`context`、`doctor`。`restore` 与永久 `purge` 仍延后。
+当前核心支持 `configure`、`add`、`list`、`show`、`check-update`、`update`、`unregister`、`trash`、`restore`、`status`、`map`、`unmap`、`context`、`doctor`。永久 `purge` 仍延后，不得用手工删除绕过恢复边界。
 
 参考库命令使用 Python 3 标准库核心；这只是可选 reference 能力的前置条件，不影响 `init-project.ps1` 或 `init-project.sh`。
 
@@ -126,12 +129,17 @@ Agent 必须先读当前项目，再按任务命中情况读取 reference。默�
 - 不输出 credential-bearing URL。
 - dirty reference repo 不自动清理。
 - `unmap` 只解除项目映射，不删除全局 clone。
+- `unregister` 只移除 catalog，保留 clone；仍被项目映射时拒绝执行。
+- `trash` 先写 manifest，再移动 repo 与 catalog；dirty 修改原样保留。
+- `restore` 只接受单个 trash 目录名，校验 manifest、catalog snapshot 与 canonical 原路径；目标已存在、内容未知或记录损坏时拒绝覆盖。
+- restore 成功后将 manifest 标记为 `restored` 并归档到 `logs/restores/`，不留下可重复应用的活动 trash 条目。
+- `purge` 尚未开放；任何永久删除都必须作为独立 lifecycle 设计和 review。
 - license 缺失必须显示为 `unknown`，不能当作可自由复制。
 - reference repos、机器配置、context cache 和 logs 不进入业务项目或 AWZ release 包。
 
 ### Transaction 与失败恢复
 
-- `configure`、`add`、`map`、`unmap` 和 `context` 的真实写入会在 `<referenceRoot>/logs/transactions/` 创建 transaction JSON。
+- `configure`、`add`、`update`、`unregister`、`trash`、`restore`、`map`、`unmap` 和 `context` 的真实写入会在 `<referenceRoot>/logs/transactions/` 创建 transaction JSON。
 - transaction 状态按 `planned → applying → completed/failed` 流转，并记录 `planHash`、actions、completed、remaining、recovery 和脱敏错误。
 - JSON apply 成功时在 `data.transaction` 返回 transaction 摘要；失败时使用 `blockedBy`、`recovery` 和可用的 transaction 摘要说明阻塞与恢复入口。
 - 文本 CLI 失败时也必须打印 transaction 路径和 recovery，不让用户只能从半成品猜测发生了什么。

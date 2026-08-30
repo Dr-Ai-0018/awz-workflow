@@ -436,6 +436,29 @@ class ReferenceCliTransactionTests(unittest.TestCase):
             self.assertEqual("trashed", manifest["state"])
             self.assertTrue((trash_dir / "repo" / ".git").exists())
             self.assertTrue((trash_dir / "catalog.json").exists())
+            unsafe_manifest = {**manifest, "original": {**manifest["original"], "repository": "logs/wrong-target"}}
+            (trash_dir / "manifest.json").write_text(json.dumps(unsafe_manifest), encoding="utf-8")
+            unsafe_restore = self.run_cli(config_dir, "restore", "--trash-id", trash_dir.name, "--dry-run", "--json", reference_root=reference_root)
+            self.assertEqual(1, unsafe_restore.returncode)
+            self.assertIn("do not match canonical targets", unsafe_restore.stdout)
+            (trash_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            conflict_repo = reference_root / "repos" / "general" / "trash-fixture"
+            conflict_repo.mkdir(parents=True)
+            blocked_restore = self.run_cli(config_dir, "restore", "--trash-id", trash_dir.name, "--dry-run", "--json", reference_root=reference_root)
+            self.assertEqual(1, blocked_restore.returncode)
+            self.assertTrue(json.loads(blocked_restore.stdout)["blockedBy"])
+            self.assertTrue((trash_dir / "repo" / ".git").exists())
+            conflict_repo.rmdir()
+            restore_preview = self.run_cli(config_dir, "restore", "--trash-id", trash_dir.name, "--dry-run", "--json", reference_root=reference_root)
+            self.assertEqual(0, restore_preview.returncode, restore_preview.stderr)
+            restored = self.run_cli(config_dir, "restore", "--trash-id", trash_dir.name, "--json", "--plan-hash", json.loads(restore_preview.stdout)["plan"]["planHash"], reference_root=reference_root)
+            self.assertEqual(0, restored.returncode, restored.stderr)
+            restored_data = json.loads(restored.stdout)["data"]
+            self.assertTrue((reference_root / "repos" / "general" / "trash-fixture" / ".git").exists())
+            self.assertTrue((reference_root / "catalog" / "trash-fixture.json").exists())
+            self.assertFalse(trash_dir.exists())
+            history = json.loads(Path(restored_data["history"]).read_text(encoding="utf-8"))
+            self.assertEqual("restored", history["state"])
 
 
 if __name__ == "__main__":

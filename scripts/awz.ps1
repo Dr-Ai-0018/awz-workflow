@@ -517,27 +517,31 @@ function Invoke-ReferenceRemoval {
     while ($true) {
         $selected = Select-AwzTuiOption -Title "Reference 登记生命周期" -Subtitle "删除默认进入可恢复 trash；先检查项目映射" -Step "HOME  ───  REFERENCE  ───  [REMOVAL]" -Options @(
             [pscustomobject]@{ Label = "取消登记"; Description = "移除 catalog，保留全局 clone；映射占用时阻止"; Value = "unregister" },
-            [pscustomobject]@{ Label = "移入 trash"; Description = "repo 与 catalog 一起移入 root/trash，可恢复"; Value = "trash" }
+            [pscustomobject]@{ Label = "移入 trash"; Description = "repo 与 catalog 一起移入 root/trash，可恢复"; Value = "trash" },
+            [pscustomobject]@{ Label = "从 trash 恢复"; Description = "按 manifest 恢复；目标已存在时拒绝覆盖"; Value = "restore" }
         ) -AllowBack
         if (-not $selected) { return "exit" }
         if ($selected -eq "__AWZ_BACK__") { return "back" }
-        $referenceId = Read-AwzTuiText -Title "Reference 登记生命周期" -Label "Reference id" -Hint "必须已登记；映射占用时核心层会明确阻止" -Step "HOME  ───  REFERENCE  ───  [REMOVAL]" -Required -AllowBack -ExitOnQuit
-        if ($referenceId -eq "__AWZ_EXIT__") { return "exit" }
-        if ($referenceId -eq "__AWZ_BACK__") { continue }
-        $token = if ($selected -eq "trash") { "TRASH" } else { "UNREGISTER" }
+        $label = if ($selected -eq "restore") { "Trash id" } else { "Reference id" }
+        $hint = if ($selected -eq "restore") { "输入 trash 目录名；可从 trash 完成页复制" } else { "必须已登记；映射占用时核心层会明确阻止" }
+        $identifier = Read-AwzTuiText -Title "Reference 登记生命周期" -Label $label -Hint $hint -Step "HOME  ───  REFERENCE  ───  [REMOVAL]" -Required -AllowBack -ExitOnQuit
+        if ($identifier -eq "__AWZ_EXIT__") { return "exit" }
+        if ($identifier -eq "__AWZ_BACK__") { continue }
+        $token = if ($selected -eq "trash") { "TRASH" } elseif ($selected -eq "restore") { "RESTORE" } else { "UNREGISTER" }
+        $arguments = if ($selected -eq "restore") { @("restore", "--trash-id", $identifier) } else { @($selected, "--id", $identifier) }
         try {
-            $applied = Invoke-ReferencePlanApply -ReferenceCli $ReferenceCli -Arguments @($selected, "--id", $referenceId) -Title "$token $referenceId" -ConfirmToken $token
+            $applied = Invoke-ReferencePlanApply -ReferenceCli $ReferenceCli -Arguments $arguments -Title "$token $identifier" -ConfirmToken $token
             if ($applied -eq "__AWZ_EXIT__") { return "exit" }
             if ($applied -eq "__AWZ_BACK__") { continue }
             $transaction = $applied.data.transaction
-            $target = if ($selected -eq "trash") { $applied.data.trash } else { $applied.data.repository }
+            $target = if ($selected -eq "trash") { $applied.data.trash } elseif ($selected -eq "restore") { $applied.data.repository } else { $applied.data.repository }
             $page = Show-AwzReadOnlyPage -Title "Reference $token 已完成" -Subtitle "操作已按预览计划执行" -Content @(
                 "Reference    $($applied.data.id)",
                 "Target       $target",
                 "Transaction  $($transaction.path)",
                 "状态         $($transaction.state)",
                 "",
-                $(if ($selected -eq "trash") { "可使用 manifest 进入后续 restore；不要直接删除 trash。" } else { "全局 clone 已保留，可用同一 id 重新登记。" })
+                $(if ($selected -eq "trash") { "可使用 trash id 进入 restore；不要直接删除 trash。" } elseif ($selected -eq "restore") { "恢复 manifest 已归档到 logs/restores。" } else { "全局 clone 已保留，可用同一 id 重新登记。" })
             ) -Step "HOME  ───  REFERENCE  ───  [REMOVAL DONE]"
             if ($page -eq "exit") { return "exit" }
         }

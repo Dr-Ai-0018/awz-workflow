@@ -43,7 +43,7 @@ Windows 与 POSIX 默认主菜单语义一致：
 5. `Doctor`：展示 reference root、配置来源、条目状态和离线问题；
 6. `Q`：退出控制中心；子页面使用 `B` 返回。
 
-当前控制中心的全局 Reference 浏览、项目 mapping 与 Doctor 页面只读，refresh 页面不会提供 apply；`配置 Reference root`、项目 `map/unmap/context` 与 Reference `add` 已接入 DryRun、planHash 和 transaction 保护。`update`、`trash/restore/purge` 等写操作仍需继续使用 CLI，直到各自的结构化预览、分级确认和恢复界面完成。
+当前控制中心的全局 Reference 浏览、项目 mapping 与 Doctor 页面只读，refresh 页面不会提供 apply。`配置 Reference root`、项目 `map/unmap/context`、Reference `add`、fast-forward `update`、`unregister`、`trash` 与 `restore` 已接入统一的 DryRun、planHash、明确确认和 transaction 保护。永久 `purge` 尚未开放。
 
 ## Windows 初始化子流程
 
@@ -81,6 +81,9 @@ POSIX `awz.sh` 已对齐五项主菜单、Reference 全局列表/详情、项目
 - TUI 不直接复制模板、创建目录或运行 `git init`。
 - TUI 不直接读取或拼接 catalog 文件；只消费 Reference Library 的结构化 JSON。
 - Reference 与 Doctor 页面不得写配置、catalog、mapping 或 repo；refresh 检查不得 apply 或生成 manifest。
+- update 只允许 fast-forward；dirty、detached、diverged 或 DryRun 后状态变化时必须拒绝执行。
+- unregister 保留 clone；trash 保留 repo（包括 dirty 修改）和恢复 manifest；restore 不得覆盖任何既有目标。
+- 永久 purge 未完成独立 review 前，TUI 不提供等价入口或手工删除捷径。
 - Existing 模式仍永久保护项目自有的 `.gitignore`、`.env.example`、`README.md` 和 `LICENSE`。
 - 登录、密钥、环境变量或技术栈配置不在 v1 TUI 中自动推断或写入。
 
@@ -143,15 +146,16 @@ bash scripts/smoke-awz-tui.sh
 - Windows 控制中心 frame 包含五项入口、完整边框、步骤栏、编号选择与明确输入提示；
 - 两端使用隔离配置验证 Reference list、Doctor 和 refresh DryRun，且不接触真实 Reference Library、不生成 refresh manifest；
 - 两端使用隔离项目验证项目 mapping 的 mapped/unresolved、purpose 和 required 状态，且不生成 context；
+- 两端 lifecycle 入口使用结构化 DryRun 与精确确认词；restore 冲突时不移动任何文件；
 - 测试结束后没有临时残留。
 
 ## 后续演进
 
 TUI 后续按独立、可恢复的 lifecycle 扩展：
 
-1. 配置、add、map/unmap 与 context：先预览结构化计划，再显式 apply；
-2. check-update 与 fast-forward update：保留 dirty repo、detached、diverged 和 stale-plan 阻止；
-3. unregister 与 trash：事务、映射占用检查、manifest 和目标校验必须先齐全；restore 与最后才开放的 purge 继续延后；
+1. 已完成配置、add、map/unmap、context、check-update 与 fast-forward update 的跨平台安全写入流程；
+2. 已完成 unregister、trash 与 restore：映射占用、manifest、canonical 路径和覆盖冲突均由底层核心校验；
+3. purge 最后开放：必须使用独立计划、强确认和不可恢复风险说明，不复用普通删除确认；
 4. 环境 Doctor：检查 Git、PowerShell/Bash、uv、pnpm 等能力，只报告不安装；
 5. 技术栈初始化：仅在用户明确选择 Python/Node 等类型后调用独立脚手架，不并入通用 init。
 
