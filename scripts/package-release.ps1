@@ -73,7 +73,7 @@ foreach ($relativePath in $releasePaths) {
     }
 }
 
-& git -C $root archive --format=tar.gz "--prefix=$releaseDirectoryName/" "--output=$packagePath" HEAD -- @releasePaths
+& git -C $root -c core.autocrlf=false archive --format=tar.gz "--prefix=$releaseDirectoryName/" "--output=$packagePath" HEAD -- @releasePaths
 if ($LASTEXITCODE -ne 0) {
     if (Test-Path -LiteralPath $packagePath) {
         Remove-Item -LiteralPath $packagePath -Force

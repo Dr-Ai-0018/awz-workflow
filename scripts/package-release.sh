@@ -65,7 +65,7 @@ for path in "${release_paths[@]}"; do
     git -C "$root" cat-file -e "HEAD:$path" || die "Release source is missing from HEAD: $path"
 done
 
-if ! git -C "$root" archive \
+if ! git -C "$root" -c core.autocrlf=false archive \
     --format=tar.gz \
     --prefix="$release_dir/" \
     --output="$package_path" \

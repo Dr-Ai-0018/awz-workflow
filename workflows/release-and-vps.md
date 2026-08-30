@@ -44,7 +44,7 @@ dist/awz-workflow-v<version>.tar.gz
 - 两个 `package-release` 脚本：在 Windows 与 Linux/macOS 上生成同一格式的 release 包；
 - `dist/`：只放可分发产物，不进 git；
 - release 包必须带齐脚本、模板、LICENSE、README、VERSION、CHANGELOG，不依赖开发机上的其他目录。
-- release 包必须直接来自 committed `HEAD` 的 Git tracked blobs，不复制受 `core.autocrlf` 等 checkout 配置影响的 working-tree 字节；同一 commit 在 Windows/POSIX 生成的包应具有相同路径和逐文件 SHA-256。
+- release 包必须直接来自 committed `HEAD` 的 Git tracked blobs，并在打包子进程显式禁用 `core.autocrlf`，不复制或转换 working-tree 字节；同一 commit 在 Windows/POSIX 生成的包应具有相同路径和逐文件 SHA-256。
 
 Windows 和 Linux 初始化器必须对齐这些语义：
 
