@@ -462,7 +462,10 @@ reference_project_actions() {
     while true; do
         section '项目 Reference lifecycle'
         printf '%s\n' '  1. Map reference       DryRun 后写入项目 mapping' '  2. Unmap reference     仅移除项目 mapping，保留全局 clone' '  3. Generate context    DryRun 后生成项目 reference context' '  B. 返回' '  Q. 退出'
-        read -r -p '请选择: ' choice
+        if ! read -r -p '请选择: ' choice; then
+            printf '%s\n' '输入已关闭，安全退出。'
+            exit 0
+        fi
         case "${choice,,}" in
             b) return 0 ;;
             q) return 10 ;;
@@ -514,10 +517,13 @@ reference_browser() {
             '  5. 项目 mapping lifecycle  map、unmap 与 context 受控写入' \
             '  6. 检查 Reference 更新  只读查询 origin，不执行 update' \
             '  7. 应用 Reference 更新  DryRun 后仅允许 fast-forward' \
-            '  8. 登记生命周期  取消登记或移入可恢复 trash' \
+            '  8. 登记生命周期  取消登记、移入 trash 或恢复' \
             '  B. 返回控制中心' \
             '  Q. 退出'
-        read -r -p '请选择: ' choice
+        if ! read -r -p '请选择: ' choice; then
+            printf '%s\n' '输入已关闭，安全退出。'
+            exit 0
+        fi
         case "${choice,,}" in
             1) if reference_list_browser; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
             2) if reference_add; then status=0; else status=$?; fi; ((status == 10)) && return 10 ;;
@@ -679,7 +685,10 @@ if [[ -z "$action" ]]; then
         printf '%s\n' '  4. 安全刷新检查     manifest DryRun，不执行写入'
         printf '%s\n' '  5. Doctor            离线诊断配置与 reference'
         printf '%s\n\n' '  Q. 退出'
-        read -r -p '请选择: ' choice
+        if ! read -r -p '请选择: ' choice; then
+            printf '%s\n' '输入已关闭，安全退出。'
+            exit 0
+        fi
         case "${choice,,}" in
             1)
                 interactive_menu=true

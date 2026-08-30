@@ -11,6 +11,8 @@ $tuiModule = Join-Path $PSScriptRoot "lib/AwzTui.psm1"
 $referenceCli = Join-Path $PSScriptRoot "reference-library.ps1"
 $refreshCli = Join-Path $PSScriptRoot "refresh-project.ps1"
 $dryRunPath = Join-Path $root ("temp/smoke-tui-dryrun-" + [guid]::NewGuid().ToString("N"))
+$longDryRunPath = Join-Path $root ("temp/smoke-tui-长路径-" + ("段" * 60) + "-" + [guid]::NewGuid().ToString("N"))
+$cancelPath = Join-Path $root ("temp/smoke-tui-cancel-" + [guid]::NewGuid().ToString("N"))
 $batchDryRunPath = Join-Path $root ("temp/smoke-tui-bat-" + [guid]::NewGuid().ToString("N"))
 $applyPath = Join-Path $root ("temp/smoke-tui-apply-" + [guid]::NewGuid().ToString("N"))
 $occupiedPath = Join-Path $root ("temp/smoke-tui-occupied-" + [guid]::NewGuid().ToString("N"))
@@ -32,6 +34,7 @@ function Assert-True {
 
 try {
     & $tui --help | Out-Null
+    $tuiRuntime = Import-Module $tuiModule -Force -PassThru
 
     $tuiSource = Get-Content -LiteralPath $tui -Raw
     $tuiModuleSource = Get-Content -LiteralPath $tuiModule -Raw
@@ -47,6 +50,7 @@ try {
     Assert-True $tuiSource.Contains("function Invoke-ReferenceCheckUpdate") "Control center is missing the Reference update check flow"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceUpdate") "Control center is missing the Reference update flow"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceRemoval") "Control center is missing the Reference removal flow"
+    Assert-True $tuiSource.Contains('elseif ($selected -eq "restore") { "RESTORE" }') "Control center restore flow lost its exact confirmation token"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceMapping") "Control center is missing the project mapping view"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceConfigure") "Control center is missing the Reference configure flow"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceProjectActions") "Control center is missing project mapping lifecycle actions"
@@ -61,12 +65,32 @@ try {
         Assert-True $demoText.Contains($token) "Rendered TUI frame is missing: $token"
     }
 
+    $emojiWidth = & $tuiRuntime { Get-AwzDisplayWidth "A中👩‍💻❤️🇨🇳" }
+    Assert-True ($emojiWidth -eq 9) "Emoji/CJK display width changed: $emojiWidth"
+    $limitedEmoji = & $tuiRuntime { Limit-AwzDisplayText -Text "前缀👩‍💻🇨🇳后缀" -MaxWidth 9 }
+    Assert-True ($limitedEmoji -ceq "前缀👩‍💻🇨🇳…") "Emoji truncation split a grapheme cluster: $limitedEmoji"
+    $narrowFrame = @(New-AwzTuiFrame -Title "窄窗口" -Subtitle "中文与 emoji 👩‍💻" -Content @("路径 " + ("长" * 30)) -Width 48 -BodyHeight 2)
+    foreach ($line in $narrowFrame) {
+        $lineWidth = & $tuiRuntime { param($Value) Get-AwzDisplayWidth $Value } $line
+        Assert-True ($lineWidth -eq 48) "Narrow frame line width changed: $lineWidth"
+    }
+
     $batchDemo = @(& $batchTui -RenderDemo)
     Assert-True ($LASTEXITCODE -eq 0) "BAT TUI demo render failed"
     Assert-True (($batchDemo -join "`n").Contains("PROJECT CONTROL")) "BAT did not render the full-screen TUI frame"
 
     & $tui -Action init -TargetPath $dryRunPath -ProjectName "AWZ TUI DryRun" -DryRunOnly
     Assert-True (-not (Test-Path -LiteralPath $dryRunPath)) "PowerShell DryRunOnly created the target"
+
+    & $tui -Action init -TargetPath $longDryRunPath -ProjectName "天云验收 👩‍💻" -DryRunOnly
+    Assert-True (-not (Test-Path -LiteralPath $longDryRunPath)) "Long Unicode path DryRunOnly created the target"
+
+    $closedInput = @("q" | & $tui -Classic *>&1) -join "`n"
+    Assert-True $closedInput.Contains("输入已关闭，安全退出。") "Closed stdin did not exit the Classic flow safely"
+
+    $cancelOutput = @("n" | & $tui -Action init -TargetPath $cancelPath -ProjectName "AWZ TUI Cancel" *>&1) -join "`n"
+    Assert-True $cancelOutput.Contains("已取消，未执行写入。") "Closed confirmation did not report a safe cancellation"
+    Assert-True (-not (Test-Path -LiteralPath $cancelPath)) "Cancelled initialization created the target"
 
     & $batchTui -Action init -TargetPath $batchDryRunPath -ProjectName "AWZ TUI Batch" -DryRunOnly
     Assert-True ($LASTEXITCODE -eq 0) "BAT TUI dry-run failed"
@@ -145,7 +169,7 @@ finally {
     $env:AWZ_CONFIG_DIR = $previousConfigDir
     $env:AWZ_REFERENCE_ROOT = $previousReferenceRoot
     if (-not $KeepArtifacts) {
-        foreach ($path in @($dryRunPath, $batchDryRunPath, $applyPath, $occupiedPath, $readOnlyFixture)) {
+        foreach ($path in @($dryRunPath, $longDryRunPath, $cancelPath, $batchDryRunPath, $applyPath, $occupiedPath, $readOnlyFixture)) {
             if (Test-Path -LiteralPath $path) {
                 Remove-Item -LiteralPath $path -Recurse -Force
             }

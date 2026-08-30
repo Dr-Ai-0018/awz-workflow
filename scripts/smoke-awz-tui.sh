@@ -10,6 +10,9 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 root=$(cd "$script_dir/.." && pwd -P)
 tui="$script_dir/awz.sh"
 dryrun_path="$root/temp/smoke-tui-dryrun-${RANDOM}-${RANDOM}"
+long_segment=$(printf '段%.0s' {1..60})
+long_dryrun_path="$root/temp/smoke-tui-长路径-${long_segment}-${RANDOM}-${RANDOM}"
+cancel_path="$root/temp/smoke-tui-cancel-${RANDOM}-${RANDOM}"
 apply_path="$root/temp/smoke-tui-apply-${RANDOM}-${RANDOM}"
 occupied_path="$root/temp/smoke-tui-occupied-${RANDOM}-${RANDOM}"
 read_only_path="$root/temp/smoke-tui-readonly-${RANDOM}-${RANDOM}"
@@ -24,7 +27,7 @@ fi
 
 cleanup() {
     if [[ "$keep_artifacts" != true ]]; then
-        rm -rf "$dryrun_path" "$apply_path" "$occupied_path" "$read_only_path"
+        rm -rf "$dryrun_path" "$long_dryrun_path" "$cancel_path" "$apply_path" "$occupied_path" "$read_only_path"
     fi
 }
 trap cleanup EXIT
@@ -36,14 +39,25 @@ grep -q '^reference_add()' "$tui" || die 'POSIX TUI is missing the Reference add
 grep -q '^reference_check_update()' "$tui" || die 'POSIX TUI is missing the Reference update check flow'
 grep -q '^reference_update()' "$tui" || die 'POSIX TUI is missing the Reference update flow'
 grep -q '^reference_removal()' "$tui" || die 'POSIX TUI is missing the Reference removal flow'
+grep -q '从 trash 恢复' "$tui" || die 'POSIX TUI is missing the Reference restore entry'
 
 menu_output=$(printf 'q\n' | bash "$tui")
 for token in 'AWZ Workflow 控制中心' '1. 创建新项目' '2. 接入已有项目' '3. Reference Library' '4. 安全刷新检查' '5. Doctor'; do
     [[ "$menu_output" == *"$token"* ]] || die "Control center menu is missing: $token"
 done
 
+closed_output=$(bash "$tui" </dev/null)
+[[ "$closed_output" == *'输入已关闭，安全退出。'* ]] || die 'Closed stdin did not exit the POSIX control center safely'
+
 bash "$tui" --action init --target "$dryrun_path" --name 'AWZ TUI DryRun' --dry-run-only
 [[ ! -e "$dryrun_path" ]] || die 'DryRunOnly created the target'
+
+bash "$tui" --action init --target "$long_dryrun_path" --name '天云验收 👩‍💻' --dry-run-only
+[[ ! -e "$long_dryrun_path" ]] || die 'Long Unicode path DryRunOnly created the target'
+
+cancel_output=$(printf 'n\n' | bash "$tui" --action init --target "$cancel_path" --name 'AWZ TUI Cancel')
+[[ "$cancel_output" == *'已取消，未执行写入。'* ]] || die 'POSIX cancellation did not report a safe result'
+[[ ! -e "$cancel_path" ]] || die 'Cancelled POSIX initialization created the target'
 
 bash "$tui" --action init --target "$apply_path" --name 'AWZ TUI Apply' --yes
 [[ -d "$apply_path/.git" ]] || die 'TUI apply did not initialize Git'

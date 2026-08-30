@@ -2,21 +2,122 @@
     param([string]$Text)
 
     $width = 0
-    foreach ($char in $Text.ToCharArray()) {
-        $code = [int]$char
-        if (
-            ($code -ge 0x1100 -and $code -le 0x115F) -or
-            ($code -ge 0x2E80 -and $code -le 0xA4CF) -or
-            ($code -ge 0xAC00 -and $code -le 0xD7A3) -or
-            ($code -ge 0xF900 -and $code -le 0xFAFF) -or
-            ($code -ge 0xFE10 -and $code -le 0xFE6F) -or
-            ($code -ge 0xFF00 -and $code -le 0xFF60)
-        ) {
-            $width += 2
+    foreach ($cluster in @(Get-AwzDisplayClusters $Text)) {
+        $width += Get-AwzClusterWidth $cluster
+    }
+    return $width
+}
+
+function Get-AwzCodePoints {
+    param([string]$Text)
+
+    $points = [System.Collections.Generic.List[int]]::new()
+    for ($index = 0; $index -lt $Text.Length; $index++) {
+        $character = $Text[$index]
+        if ([char]::IsHighSurrogate($character) -and ($index + 1) -lt $Text.Length -and [char]::IsLowSurrogate($Text[$index + 1])) {
+            $points.Add([char]::ConvertToUtf32($character, $Text[$index + 1]))
+            $index++
         }
         else {
-            $width += 1
+            $points.Add([int]$character)
         }
+    }
+    return $points.ToArray()
+}
+
+function Test-AwzRegionalIndicator {
+    param([int]$CodePoint)
+    return $CodePoint -ge 0x1F1E6 -and $CodePoint -le 0x1F1FF
+}
+
+function Test-AwzEmojiCodePoint {
+    param([int]$CodePoint)
+    return $CodePoint -ge 0x1F000 -and $CodePoint -le 0x1FAFF
+}
+
+function Test-AwzZeroWidthCodePoint {
+    param([int]$CodePoint)
+    return (
+        $CodePoint -eq 0x200D -or
+        ($CodePoint -ge 0x0300 -and $CodePoint -le 0x036F) -or
+        ($CodePoint -ge 0x1AB0 -and $CodePoint -le 0x1AFF) -or
+        ($CodePoint -ge 0x1DC0 -and $CodePoint -le 0x1DFF) -or
+        ($CodePoint -ge 0x20D0 -and $CodePoint -le 0x20FF) -or
+        ($CodePoint -ge 0xFE00 -and $CodePoint -le 0xFE0F) -or
+        ($CodePoint -ge 0xFE20 -and $CodePoint -le 0xFE2F) -or
+        ($CodePoint -ge 0x1F3FB -and $CodePoint -le 0x1F3FF) -or
+        ($CodePoint -ge 0xE0100 -and $CodePoint -le 0xE01EF)
+    )
+}
+
+function Test-AwzWideCodePoint {
+    param([int]$CodePoint)
+    return (
+        ($CodePoint -ge 0x1100 -and $CodePoint -le 0x115F) -or
+        ($CodePoint -ge 0x2E80 -and $CodePoint -le 0xA4CF) -or
+        ($CodePoint -ge 0xAC00 -and $CodePoint -le 0xD7A3) -or
+        ($CodePoint -ge 0xF900 -and $CodePoint -le 0xFAFF) -or
+        ($CodePoint -ge 0xFE10 -and $CodePoint -le 0xFE6F) -or
+        ($CodePoint -ge 0xFF00 -and $CodePoint -le 0xFF60) -or
+        ($CodePoint -ge 0xFFE0 -and $CodePoint -le 0xFFE6) -or
+        ($CodePoint -ge 0x20000 -and $CodePoint -le 0x3FFFD) -or
+        (Test-AwzEmojiCodePoint $CodePoint)
+    )
+}
+
+function Get-AwzDisplayClusters {
+    param([string]$Text)
+
+    $elements = [System.Collections.Generic.List[string]]::new()
+    $enumerator = [Globalization.StringInfo]::GetTextElementEnumerator($Text)
+    while ($enumerator.MoveNext()) {
+        $elements.Add($enumerator.GetTextElement())
+    }
+
+    $clusters = [System.Collections.Generic.List[string]]::new()
+    for ($index = 0; $index -lt $elements.Count; $index++) {
+        $cluster = $elements[$index]
+        $points = @(Get-AwzCodePoints $cluster)
+        if ($points.Count -eq 1 -and (Test-AwzRegionalIndicator $points[0]) -and ($index + 1) -lt $elements.Count) {
+            $nextPoints = @(Get-AwzCodePoints $elements[$index + 1])
+            if ($nextPoints.Count -eq 1 -and (Test-AwzRegionalIndicator $nextPoints[0])) {
+                $index++
+                $cluster += $elements[$index]
+            }
+        }
+        while (($index + 2) -lt $elements.Count) {
+            $joiner = @(Get-AwzCodePoints $elements[$index + 1])
+            if ($joiner.Count -ne 1 -or $joiner[0] -ne 0x200D) {
+                break
+            }
+            $cluster += $elements[$index + 1] + $elements[$index + 2]
+            $index += 2
+        }
+        if (($index + 1) -lt $elements.Count) {
+            $modifier = @(Get-AwzCodePoints $elements[$index + 1])
+            if ($modifier.Count -eq 1 -and $modifier[0] -ge 0x1F3FB -and $modifier[0] -le 0x1F3FF) {
+                $index++
+                $cluster += $elements[$index]
+            }
+        }
+        $clusters.Add($cluster)
+    }
+    return $clusters.ToArray()
+}
+
+function Get-AwzClusterWidth {
+    param([string]$Text)
+
+    $points = @(Get-AwzCodePoints $Text)
+    if ($points | Where-Object { $_ -eq 0x200D -or $_ -eq 0xFE0F -or (Test-AwzRegionalIndicator $_) -or (Test-AwzEmojiCodePoint $_) }) {
+        return 2
+    }
+    $width = 0
+    foreach ($codePoint in $points) {
+        if (Test-AwzZeroWidthCodePoint $codePoint) {
+            continue
+        }
+        $width += if (Test-AwzWideCodePoint $codePoint) { 2 } else { 1 }
     }
     return $width
 }
@@ -31,15 +132,18 @@ function Limit-AwzDisplayText {
         return $Text
     }
 
+    if ($MaxWidth -le 0) {
+        return ""
+    }
     $result = ""
     $used = 0
-    foreach ($char in $Text.ToCharArray()) {
-        $charWidth = Get-AwzDisplayWidth ([string]$char)
-        if (($used + $charWidth) -gt ($MaxWidth - 1)) {
+    foreach ($cluster in @(Get-AwzDisplayClusters $Text)) {
+        $clusterWidth = Get-AwzClusterWidth $cluster
+        if (($used + $clusterWidth) -gt ($MaxWidth - 1)) {
             break
         }
-        $result += $char
-        $used += $charWidth
+        $result += $cluster
+        $used += $clusterWidth
     }
     return "$result…"
 }
@@ -65,7 +169,7 @@ function Get-AwzTuiWidth {
     if ($windowWidth -le 0) {
         $windowWidth = 92
     }
-    return [Math]::Min(108, [Math]::Max(76, $windowWidth - 2))
+    return [Math]::Min(108, [Math]::Max(44, $windowWidth - 2))
 }
 
 function New-AwzTuiFrame {
@@ -79,7 +183,7 @@ function New-AwzTuiFrame {
         [int]$BodyHeight = 0
     )
 
-    $Width = [Math]::Max(76, $Width)
+    $Width = [Math]::Max(44, $Width)
     if ($BodyHeight -le 0) {
         $BodyHeight = [Math]::Min(14, [Math]::Max(8, $Content.Count + 1))
     }
@@ -149,6 +253,16 @@ function Show-AwzTuiFrame {
     }
 }
 
+function Read-AwzTuiInput {
+    param([string]$Prompt)
+
+    $value = Read-Host $Prompt
+    if ($null -eq $value) {
+        return $null
+    }
+    return [string]$value
+}
+
 function Select-AwzTuiOption {
     param(
         [string]$Title,
@@ -197,7 +311,11 @@ function Select-AwzTuiOption {
         if ($pageCount -gt 1) { $prompt += "、N/P" }
         if ($AllowBack) { $prompt += "、B" }
         $prompt += " 或 Q"
-        $choice = (Read-Host $prompt).Trim()
+        $rawChoice = Read-AwzTuiInput $prompt
+        if ($null -eq $rawChoice) {
+            return $null
+        }
+        $choice = $rawChoice.Trim()
         if ($choice -match '^[qQ]$') {
             return $null
         }
@@ -255,7 +373,11 @@ function Read-AwzTuiText {
         $footer = if ($AllowBack) { "在面板下方输入；B 返回；Q 退出" } else { "在面板下方输入；输入 Q 取消" }
         Show-AwzTuiFrame -Title $Title -Subtitle "稳定输入模式：不逐键重绘终端" -Content $content -Step $Step -Footer $footer
 
-        $input = Read-Host $Label
+        $input = Read-AwzTuiInput $Label
+        if ($null -eq $input) {
+            if ($ExitOnQuit) { return "__AWZ_EXIT__" }
+            return $null
+        }
         if ($input -match '^[qQ]$') {
             if ($ExitOnQuit) { return "__AWZ_EXIT__" }
             return $null
@@ -269,7 +391,12 @@ function Read-AwzTuiText {
                 "留空时使用默认值（如果页面提供默认值）。",
                 "B 返回；Q 退出；H 或 ? 再次查看帮助。"
             ) -Step $Step -Footer "按 Enter 返回输入"
-            $helpChoice = (Read-Host "按 Enter 返回输入").Trim()
+            $rawHelpChoice = Read-AwzTuiInput "按 Enter 返回输入"
+            if ($null -eq $rawHelpChoice) {
+                if ($ExitOnQuit) { return "__AWZ_EXIT__" }
+                return $null
+            }
+            $helpChoice = $rawHelpChoice.Trim()
             if ($helpChoice -match '^[qQ]$' -and $ExitOnQuit) { return "__AWZ_EXIT__" }
             if ($helpChoice -match '^[bB]$' -and $AllowBack) { return "__AWZ_BACK__" }
             continue
@@ -305,7 +432,11 @@ function Show-AwzTuiPreview {
     )
     Show-AwzTuiFrame -Title "检查变更计划" -Subtitle "预览已通过；执行前请检查完整输出" -Content $content -Step "01  模式   ───   02  信息   ───   03 [预览]  ───   04  执行" -Footer "A 应用；B 返回上一步；H 帮助；Q 退出"
     while ($true) {
-        $choice = (Read-Host "输入 A 应用，B 返回，H 帮助或 Q 退出").Trim()
+        $rawChoice = Read-AwzTuiInput "输入 A 应用，B 返回，H 帮助或 Q 退出"
+        if ($null -eq $rawChoice) {
+            return "__AWZ_EXIT__"
+        }
+        $choice = $rawChoice.Trim()
         if ($choice -match '^[aA]$') {
             return $true
         }
@@ -322,7 +453,9 @@ function Show-AwzTuiPreview {
                 "Q  退出控制中心",
                 "H  或 ? 再次查看帮助"
             ) -Step "01  模式   ───   02  信息   ───   03 [预览]  ───   04  执行" -Footer "按 Enter 返回预览"
-            $helpChoice = (Read-Host "按 Enter 返回预览").Trim()
+            $rawHelpChoice = Read-AwzTuiInput "按 Enter 返回预览"
+            if ($null -eq $rawHelpChoice) { return "__AWZ_EXIT__" }
+            $helpChoice = $rawHelpChoice.Trim()
             if ($helpChoice -match '^[qQ]$') { return "__AWZ_EXIT__" }
             if ($helpChoice -match '^[bB]$') { return "__AWZ_BACK__" }
         }
@@ -368,6 +501,7 @@ function Show-AwzTuiLog {
 Export-ModuleMember -Function @(
     "New-AwzTuiFrame",
     "Show-AwzTuiFrame",
+    "Read-AwzTuiInput",
     "Select-AwzTuiOption",
     "Read-AwzTuiText",
     "Show-AwzTuiPreview",

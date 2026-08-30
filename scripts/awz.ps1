@@ -58,7 +58,7 @@ function Read-RequiredValue {
     if ($Value) {
         return $Value
     }
-    $result = Read-Host $Prompt
+    $result = Read-AwzTuiInput $Prompt
     if (-not $result) {
         throw "$Prompt cannot be empty."
     }
@@ -112,7 +112,12 @@ function Invoke-ScriptedFlow {
         Write-Host "  1. 创建新项目"
         Write-Host "  2. 接入已有项目"
         Write-Host "  Q. 退出"
-        $choice = (Read-Host "请选择").Trim().ToLowerInvariant()
+        $rawChoice = Read-AwzTuiInput "请选择"
+        if ($null -eq $rawChoice) {
+            Write-Host "输入已关闭，安全退出。" -ForegroundColor Yellow
+            return
+        }
+        $choice = $rawChoice.Trim().ToLowerInvariant()
         switch ($choice) {
             "1" { $script:Action = "init"; $script:Mode = "New" }
             "2" { $script:Action = "init"; $script:Mode = "Existing" }
@@ -135,7 +140,8 @@ function Invoke-ScriptedFlow {
     }
 
     if ($UseClassicMenu -and $script:Mode -eq "Existing" -and (-not $script:Force)) {
-        $refreshChoice = (Read-Host "是否刷新 AWZ 管理的本地指导文件？[y/N]").Trim().ToLowerInvariant()
+        $rawRefreshChoice = Read-AwzTuiInput "是否刷新 AWZ 管理的本地指导文件？[y/N]"
+        $refreshChoice = if ($null -eq $rawRefreshChoice) { "" } else { $rawRefreshChoice.Trim().ToLowerInvariant() }
         $script:Force = $refreshChoice -in @("y", "yes")
     }
 
@@ -156,10 +162,11 @@ function Invoke-ScriptedFlow {
     $confirmed = [bool]$script:Yes
     if (-not $confirmed) {
         if ($script:Mode -eq "Existing" -and $script:Force) {
-            $confirmed = (Read-Host "输入 APPLY 继续") -ceq "APPLY"
+            $confirmed = (Read-AwzTuiInput "输入 APPLY 继续") -ceq "APPLY"
         }
         else {
-            $confirmed = (Read-Host "确认执行？[y/N]").Trim().ToLowerInvariant() -in @("y", "yes")
+            $rawConfirmation = Read-AwzTuiInput "确认执行？[y/N]"
+            $confirmed = $null -ne $rawConfirmation -and $rawConfirmation.Trim().ToLowerInvariant() -in @("y", "yes")
         }
     }
     if (-not $confirmed) {
@@ -306,7 +313,9 @@ function Invoke-ReferencePlanApply {
     $content.Add("输入 $ConfirmToken 应用；B 返回；Q 退出。")
     Show-AwzTuiFrame -Title "$Title · 预览" -Subtitle "DryRun 完成；apply 必须匹配当前 planHash" -Content $content.ToArray() -Step "HOME  ───  REFERENCE  ───  [WRITE PREVIEW]" -Footer "$ConfirmToken 应用；B 返回；Q 退出"
     while ($true) {
-        $choice = (Read-Host "输入 $ConfirmToken 应用，B 返回或 Q 退出").Trim()
+        $rawChoice = Read-AwzTuiInput "输入 $ConfirmToken 应用，B 返回或 Q 退出"
+        if ($null -eq $rawChoice) { return "__AWZ_EXIT__" }
+        $choice = $rawChoice.Trim()
         if ($choice -match '^[bB]$') { return "__AWZ_BACK__" }
         if ($choice -match '^[qQ]$') { return "__AWZ_EXIT__" }
         $matches = if ($ConfirmToken -eq "A") { $choice -match '^[aA]$' } else { $choice -ceq $ConfirmToken }
@@ -325,7 +334,9 @@ function Show-AwzReadOnlyPage {
 
     Show-AwzTuiFrame -Title $Title -Subtitle $Subtitle -Content $Content -Step $Step -Footer "按 B 返回控制中心；Q 退出"
     while ($true) {
-        $choice = (Read-Host "输入 B 返回，Q 退出").Trim()
+        $rawChoice = Read-AwzTuiInput "输入 B 返回，Q 退出"
+        if ($null -eq $rawChoice) { return "exit" }
+        $choice = $rawChoice.Trim()
         if ($choice -match '^[bB]$') { return "back" }
         if ($choice -match '^[qQ]$') { return "exit" }
     }
@@ -620,7 +631,9 @@ function Invoke-ReferenceConfigure {
         $content += "输入 A 应用；B 返回；Q 退出。"
         Show-AwzTuiFrame -Title "配置 Reference root · 预览" -Subtitle "执行前确认结构化计划" -Content $content -Step "HOME  ───  REFERENCE  ───  [CONFIGURE PREVIEW]" -Footer "A 应用；B 返回；H 帮助；Q 退出"
         while ($true) {
-            $choice = (Read-Host "输入 A 应用，B 返回，H 帮助或 Q 退出").Trim()
+            $rawChoice = Read-AwzTuiInput "输入 A 应用，B 返回，H 帮助或 Q 退出"
+            if ($null -eq $rawChoice) { return "exit" }
+            $choice = $rawChoice.Trim()
             if ($choice -match '^[bB]$') { return "back" }
             if ($choice -match '^[qQ]$') { return "exit" }
             if ($choice -match '^[hH?]$') {
@@ -725,7 +738,7 @@ function Invoke-ReferenceBrowser {
             [pscustomobject]@{ Label = "项目 mapping lifecycle"; Description = "map、unmap 与 context 的受控写入"; Value = "project-actions" },
             [pscustomobject]@{ Label = "检查 Reference 更新"; Description = "只读查询 origin；dirty/diverged 状态明确阻止 update"; Value = "check-update" },
             [pscustomobject]@{ Label = "应用 Reference 更新"; Description = "DryRun 后仅允许 fast-forward，并记录 transaction"; Value = "update" },
-            [pscustomobject]@{ Label = "登记生命周期"; Description = "取消登记或移入可恢复 trash；映射占用时阻止"; Value = "removal" }
+            [pscustomobject]@{ Label = "登记生命周期"; Description = "取消登记、移入 trash 或恢复；映射占用/冲突时阻止"; Value = "removal" }
         ) -AllowBack
         if (-not $selected) { return "exit" }
         if ($selected -eq "__AWZ_BACK__") { return "back" }

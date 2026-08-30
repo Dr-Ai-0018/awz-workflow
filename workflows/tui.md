@@ -55,7 +55,7 @@ Windows 与 POSIX 默认主菜单语义一致：
 4. 强制 DryRun 与实际应用日志视图；两者都会完整展示、停留 3 秒，再进入下一阶段；输出仍可通过终端原生滚动回看；
 5. Existing + Force 的 `APPLY` 明文确认；
 6. 执行中、完成和错误状态页面；
-7. 中文等宽布局宽度修正和窄窗口内容裁剪。
+7. 中文等宽布局、emoji grapheme 安全裁剪和 44–108 列自适应 frame；更窄窗口优先保持边框完整并截断长内容。
 
 输入 `1` / `2` 选择模式；输入 `A` 应用预览计划，输入 `B` 返回控制中心，输入 `Q` 退出，输入 `H` 或 `?` 查看当前步骤帮助。已有项目且刷新 AWZ 文件时，必须输入大写 `APPLY`；脚本化调用则需要同时显式给出 Existing、Force 和 Yes。不要在输入阶段逐键重绘整个终端页面，这会在 ConPTY/Windows Terminal 环境造成残影或错位。
 
@@ -64,6 +64,8 @@ Windows 与 POSIX 默认主菜单语义一致：
 ```powershell
 .\scripts\awz.ps1 -Classic
 ```
+
+交互输入流被关闭时，Windows/POSIX 控制中心必须安全退出，不得把 EOF 当作空字符串继续执行或触发 null error。
 
 视觉契约可以在不进入交互状态机时渲染：
 
@@ -147,6 +149,7 @@ bash scripts/smoke-awz-tui.sh
 - 两端使用隔离配置验证 Reference list、Doctor 和 refresh DryRun，且不接触真实 Reference Library、不生成 refresh manifest；
 - 两端使用隔离项目验证项目 mapping 的 mapped/unresolved、purpose 和 required 状态，且不生成 context；
 - 两端 lifecycle 入口使用结构化 DryRun 与精确确认词；restore 冲突时不移动任何文件；
+- PowerShell 5.1/7 对 48 列 frame、中文、ZWJ emoji、国旗 emoji、长 Unicode 路径和关闭输入流保持一致；
 - 测试结束后没有临时残留。
 
 ## 后续演进
