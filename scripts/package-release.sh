@@ -8,7 +8,7 @@ Usage:
 
 Options:
   --output-dir <path>  Directory for the .tar.gz package. Defaults to dist.
-  --allow-dirty        Allow packaging from a dirty worktree for local smoke tests.
+  --allow-dirty        Allow packaging committed HEAD from a dirty worktree; dirty changes are excluded.
   -h, --help           Show this help message.
 EOF
 }
@@ -44,13 +44,10 @@ while (($# > 0)); do
     esac
 done
 
-[[ -f "$root/VERSION" ]] || die 'VERSION is missing.'
-[[ -f "$root/CHANGELOG.md" ]] || die 'CHANGELOG.md is missing.'
 command -v git >/dev/null 2>&1 || die 'Git is required to validate the release worktree.'
-command -v tar >/dev/null 2>&1 || die 'tar is required to create the release package.'
 
-version=$(tr -d '\r\n' < "$root/VERSION")
-[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$ ]] || die "Invalid VERSION: $version"
+version=$(git -C "$root" show HEAD:VERSION | tr -d '\r\n') || die 'VERSION is missing from HEAD.'
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$ ]] || die "Invalid VERSION in HEAD: $version"
 
 if [[ "$allow_dirty" != true ]] && [[ -n "$(git -C "$root" status --porcelain)" ]]; then
     die 'Worktree is dirty. Commit or stash changes before packaging, or use --allow-dirty only for a local smoke test.'
@@ -63,25 +60,18 @@ package_path="$output_dir/$release_dir.tar.gz"
 
 [[ ! -e "$package_path" ]] || die "Package already exists: $package_path"
 
-mkdir -p "$root/temp"
-stage_parent=$(mktemp -d "$root/temp/release-stage.XXXXXX")
-trap 'rm -rf "$stage_parent"' EXIT
-stage_root="$stage_parent/$release_dir"
-mkdir -p "$stage_root"
-
-for path in VERSION CHANGELOG.md LICENSE README.md requirements style workflows templates scripts; do
-    [[ -e "$root/$path" ]] || die "Release source is missing: $path"
-    cp -R "$root/$path" "$stage_root/$path"
+release_paths=(VERSION CHANGELOG.md LICENSE README.md requirements style workflows templates scripts)
+for path in "${release_paths[@]}"; do
+    git -C "$root" cat-file -e "HEAD:$path" || die "Release source is missing from HEAD: $path"
 done
 
-find "$stage_root" -type d -name __pycache__ -prune -exec rm -rf -- {} +
-find "$stage_root" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+if ! git -C "$root" archive \
+    --format=tar.gz \
+    --prefix="$release_dir/" \
+    --output="$package_path" \
+    HEAD -- "${release_paths[@]}"; then
+    rm -f -- "$package_path"
+    die 'git archive failed.'
+fi
 
-while IFS= read -r -d '' staged_file; do
-    relative_path=${staged_file#"$stage_root"/}
-    git -C "$root" ls-files --error-unmatch -- "$relative_path" >/dev/null 2>&1 ||
-        die "Release content is not tracked by Git: $relative_path"
-done < <(find "$stage_root" -type f -print0)
-
-tar -C "$stage_parent" -czf "$package_path" "$release_dir"
-printf 'Created release package: %s\n' "$package_path"
+printf 'Created release package from committed HEAD: %s\n' "$package_path"

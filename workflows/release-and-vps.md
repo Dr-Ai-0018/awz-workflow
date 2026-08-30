@@ -44,6 +44,7 @@ dist/awz-workflow-v<version>.tar.gz
 - 两个 `package-release` 脚本：在 Windows 与 Linux/macOS 上生成同一格式的 release 包；
 - `dist/`：只放可分发产物，不进 git；
 - release 包必须带齐脚本、模板、LICENSE、README、VERSION、CHANGELOG，不依赖开发机上的其他目录。
+- release 包必须直接来自 committed `HEAD` 的 Git tracked blobs，不复制受 `core.autocrlf` 等 checkout 配置影响的 working-tree 字节；同一 commit 在 Windows/POSIX 生成的包应具有相同路径和逐文件 SHA-256。
 
 Windows 和 Linux 初始化器必须对齐这些语义：
 
@@ -151,7 +152,7 @@ Reference Library 变更同时运行 `smoke-reference-library.ps1` / `smoke-refe
 
 refresh 变更同时运行 `smoke-refresh-project.ps1` / `smoke-refresh-project.sh`；测试必须使用隔离项目，覆盖首次 manifest 接管、稳定 no-op、本地冲突阻止和 stale plan 拒绝。
 
-打包入口默认拒绝 dirty worktree。仅为本地 smoke 时，可以显式使用 `-AllowDirty` 或 `--allow-dirty`；正式 release 禁止使用这个开关。
+打包入口默认拒绝 dirty worktree。仅为本地 smoke 时，可以显式使用 `-AllowDirty` 或 `--allow-dirty`；此时仍只归档 committed `HEAD`，不会把 dirty 改动带入包，正式 release 禁止使用这个开关。
 
 Windows：
 

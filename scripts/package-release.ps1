@@ -12,7 +12,7 @@ Usage:
 
 Options:
   -OutputDirectory <path>  Directory for the .tar.gz package. Defaults to dist.
-  -AllowDirty              Allow packaging from a dirty worktree for local smoke tests.
+  -AllowDirty              Allow packaging committed HEAD from a dirty worktree; dirty changes are excluded.
 "@
 }
 
@@ -22,28 +22,16 @@ if ($args -contains "--help" -or $args -contains "-h") {
 }
 
 $root = Split-Path -Parent $PSScriptRoot
-$versionPath = Join-Path $root "VERSION"
-$changelogPath = Join-Path $root "CHANGELOG.md"
-
-if (-not (Test-Path -LiteralPath $versionPath)) {
-    throw "VERSION is missing."
-}
-
-if (-not (Test-Path -LiteralPath $changelogPath)) {
-    throw "CHANGELOG.md is missing."
-}
-
-$version = (Get-Content -LiteralPath $versionPath -Raw -Encoding UTF8).Trim()
-if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$') {
-    throw "Invalid VERSION: $version"
-}
-
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     throw "Git is required to validate the release worktree."
 }
 
-if (-not (Get-Command tar -ErrorAction SilentlyContinue)) {
-    throw "tar is required to create the release package."
+$version = ((& git -C $root show "HEAD:VERSION") -join "`n").Trim()
+if ($LASTEXITCODE -ne 0) {
+    throw "VERSION is missing from HEAD."
+}
+if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$') {
+    throw "Invalid VERSION in HEAD: $version"
 }
 
 if (-not $AllowDirty) {
@@ -66,64 +54,31 @@ if (Test-Path -LiteralPath $packagePath) {
     throw "Package already exists: $packagePath"
 }
 
-$tempRoot = Join-Path $root "temp"
-New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
-$stageParent = Join-Path $tempRoot ("release-stage-" + [guid]::NewGuid().ToString("N"))
-$stageRoot = Join-Path $stageParent $releaseDirectoryName
+$releasePaths = @(
+    "VERSION",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "requirements",
+    "style",
+    "workflows",
+    "templates",
+    "scripts"
+)
 
-try {
-    New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
-
-    $releasePaths = @(
-        "VERSION",
-        "CHANGELOG.md",
-        "LICENSE",
-        "README.md",
-        "requirements",
-        "style",
-        "workflows",
-        "templates",
-        "scripts"
-    )
-
-    foreach ($relativePath in $releasePaths) {
-        $source = Join-Path $root $relativePath
-        if (-not (Test-Path -LiteralPath $source)) {
-            throw "Release source is missing: $relativePath"
-        }
-
-        Copy-Item -LiteralPath $source -Destination (Join-Path $stageRoot $relativePath) -Recurse -Force
-    }
-
-    Get-ChildItem -LiteralPath $stageRoot -Recurse -Directory -Filter "__pycache__" |
-        Sort-Object FullName -Descending |
-        Remove-Item -Recurse -Force
-    Get-ChildItem -LiteralPath $stageRoot -Recurse -File -Include "*.pyc", "*.pyo" |
-        Remove-Item -Force
-
-    $trackedFiles = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($trackedPath in @(& git -C $root -c core.quotepath=false ls-files)) {
-        [void]$trackedFiles.Add(([string]$trackedPath).Replace("\", "/"))
-    }
+foreach ($relativePath in $releasePaths) {
+    & git -C $root cat-file -e "HEAD:$relativePath"
     if ($LASTEXITCODE -ne 0) {
-        throw "git ls-files failed while validating release contents."
-    }
-    foreach ($stagedFile in Get-ChildItem -LiteralPath $stageRoot -Recurse -File -Force) {
-        $relativePath = $stagedFile.FullName.Substring($stageRoot.Length).TrimStart([char[]]@('\', '/')).Replace("\", "/")
-        if (-not $trackedFiles.Contains($relativePath)) {
-            throw "Release content is not tracked by Git: $relativePath"
-        }
-    }
-
-    & tar -C $stageParent -czf $packagePath $releaseDirectoryName
-    if ($LASTEXITCODE -ne 0) {
-        throw "tar failed with exit code $LASTEXITCODE"
-    }
-
-    Write-Host "Created release package: $packagePath"
-}
-finally {
-    if (Test-Path -LiteralPath $stageParent) {
-        Remove-Item -LiteralPath $stageParent -Recurse -Force
+        throw "Release source is missing from HEAD: $relativePath"
     }
 }
+
+& git -C $root archive --format=tar.gz "--prefix=$releaseDirectoryName/" "--output=$packagePath" HEAD -- @releasePaths
+if ($LASTEXITCODE -ne 0) {
+    if (Test-Path -LiteralPath $packagePath) {
+        Remove-Item -LiteralPath $packagePath -Force
+    }
+    throw "git archive failed with exit code $LASTEXITCODE"
+}
+
+Write-Host "Created release package from committed HEAD: $packagePath"
