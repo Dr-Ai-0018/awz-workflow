@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-29
+
 ### Added
 
 - append-only room ledger：受锁追加、递增序号、UTC/唯一 ID、SHA-256 链和跨平台 smoke 覆盖。
@@ -19,6 +21,8 @@
 - 基于本地 manifest 的独立项目 `refresh`：逐文件 ownership/hash 分类、stale plan 拒绝、冲突整体阻止和覆盖前备份。
 - Windows/POSIX refresh 包装器、隔离 fixture 与跨平台 smoke。
 - Windows/POSIX AWZ 控制中心主菜单，以及结构化 Reference 列表/详情、项目 mapping、只读 Doctor 和 refresh DryRun 页面。
+- Reference `add`、check-update、fast-forward update、unregister、trash 与 restore 的跨平台控制中心入口；所有写入统一使用 DryRun、planHash、精确确认和 transaction。
+- trash/restore 可恢复生命周期：保留 dirty clone、阻止映射占用与目标覆盖，并归档 restored manifest。
 - 初始化输入与预览步骤统一支持 B 返回、Q 退出和 H/? 帮助，保持原生单行编辑与 DryRun 安全边界。
 - Reference root 配置接入跨平台 TUI：DryRun 预览、planHash 绑定 apply 与 transaction 结果页。
 - 项目 mapping lifecycle 接入跨平台 TUI：map、unmap、context 均先预览，按 planHash 应用并展示 transaction 状态；unmap 不删除全局 clone。
@@ -36,7 +40,10 @@
 - 已有项目模式即使使用 `Force` 也会保留项目自有的 `.gitignore`、`.env.example`、`README.md` 和 `LICENSE`。
 - Reference Library 的计划 hash 绑定 validated inputs，损坏 Git 目录不再误判为健康仓库，所有可展示 URL 均拒绝凭据。
 - Release 打包会排除 Python `__pycache__`、`.pyc` 与 `.pyo` 本机缓存。
+- Release staging 只接受 Git tracked 文件，避免 ignored `.env`、日志或本机状态被整目录复制进分发包。
 - `Existing -Force` 不再覆盖项目持续维护的 references、status 与协作策略配置。
+- TUI 在 44–108 列窗口中保持完整 frame，并按 grapheme 安全处理中文、ZWJ emoji、国旗 emoji 和变体选择符。
+- Windows/POSIX 控制中心在输入流关闭或用户取消时安全退出，不再触发 null error 或产生目标文件。
 
 ### Changed
 
@@ -47,8 +54,13 @@
 - 新人恢复链改为先读 status 再按指针挂载 references、review、plan 和专题规则；文件搜索拆为独立按需 guide。
 - PowerShell 与 POSIX 初始化器统一为 `New`/`Existing` 双模式，并在首次写入前校验完整模板集。
 - Windows TUI 收敛为编号选择与原生单行输入的分步终端向导，保留 DryRun、危险确认、完整日志和完成/错误页面。
-- 原初始化向导升级为统一控制中心；Reference 写入生命周期仍保留在 CLI，控制中心当前只开放不会修改全局库或项目的读取与检查能力。
+- 原初始化向导升级为统一控制中心；Reference 读写生命周期由共享 CLI 核心校验，TUI 只负责结构化预览、确认和结果呈现。
 - status 与 handoff 模板补充验证事实、当前有效状态、Git 状态和恢复入口。
+
+### Verified
+
+- Windows PowerShell 5.1/7 完整 TUI smoke、48 列 frame、长 Unicode 路径、取消不落盘和真实 ConPTY 退出。
+- Ubuntu/POSIX 隔离环境 Python 20 tests 与 TUI smoke，覆盖 Reference lifecycle、长 Unicode 路径、EOF 与取消流程。
 
 ## [0.2.0] - 2026-07-12
 

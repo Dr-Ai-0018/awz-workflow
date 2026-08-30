@@ -6,22 +6,22 @@
 
 ## 当前状态
 
-`v0.1` 历史版本只有 Windows 初始化入口。`v0.2.0` 已完成 Windows PowerShell 与真实 Ubuntu VPS 的初始化、打包和解压隔离 smoke，可作为第一个正式跨平台 release。
+`v0.1` 历史版本只有 Windows 初始化入口。`v0.2.0` 是第一个正式跨平台初始化 release；`v0.3.0` 在此基础上加入统一控制中心、Reference 可恢复生命周期和安全 refresh。
 
-当前仓库在 `v0.2.0` 正式发布基线上继续具备：
+当前 `v0.3.0` 基线具备：
 
 - Windows 终端交互入口是 `scripts/awz.bat` / `scripts/awz.ps1`；
 - Ubuntu/POSIX 终端交互入口是 `scripts/awz.sh`；
 - Windows 初始化入口是 `scripts/init-project.ps1`；
 - Windows `cmd` 快捷入口是 `scripts/init-project.bat`，只转发到 PowerShell 实现；
 - Ubuntu/POSIX 初始化入口是 `scripts/init-project.sh`；
-- Unreleased 的可选 Reference Library 入口是 `scripts/reference-library.ps1` / `scripts/reference-library.sh`，共享 Python 标准库核心；
-- Unreleased 的安全项目升级入口是 `scripts/refresh-project.ps1` / `scripts/refresh-project.sh`，共享 Python 标准库核心且不改变初始化器前置条件；
+- 可选 Reference Library 入口是 `scripts/reference-library.ps1` / `scripts/reference-library.sh`，共享 Python 标准库核心；
+- 安全项目升级入口是 `scripts/refresh-project.ps1` / `scripts/refresh-project.sh`，共享 Python 标准库核心且不改变初始化器前置条件；
 - 两端都支持 dry-run、强制覆盖、UTF-8 模板渲染和 `git init -b main`；
 - Windows 与 POSIX 的 release 打包入口分别是 `package-release.ps1`、`package-release.sh`；
 - Windows PowerShell 与真实 Ubuntu VPS 的 dry-run、真实初始化和解压隔离 smoke 均已验证。
 
-因此，Ubuntu 命令可作为正式 `v0.2.0` 路径使用；后续版本仍必须重跑同一套跨平台 smoke。
+因此，Ubuntu 命令可作为正式 `v0.3.0` 路径使用；后续版本仍必须重跑同一套跨平台 smoke。
 
 ## 正式发布基线
 
@@ -88,7 +88,7 @@ set -euo pipefail
 release 包以源码目录为根，不包含 `.git/`、`temp/`、`docs/`、`dist/`、本机配置或测试残留：
 
 ```text
-awz-workflow-v0.2.0/
+awz-workflow-v0.3.0/
 ├─ VERSION
 ├─ CHANGELOG.md
 ├─ LICENSE
@@ -175,11 +175,11 @@ tag 表示可复现的发布点，不用一个巨型 commit 代替版本边界�
 
 ## VPS 使用路径
 
-`v0.2` release 可用后，VPS 的推荐安装位置是用户目录下的工具目录，而不是随手解到某个业务项目中：
+`v0.3` release 可用后，VPS 的推荐安装位置是用户目录下的工具目录，而不是随手解到某个业务项目中：
 
 ```bash
 mkdir -p "$HOME/tools/awz-workflow"
-tar -xzf awz-workflow-v0.2.0.tar.gz \
+tar -xzf awz-workflow-v0.3.0.tar.gz \
   -C "$HOME/tools/awz-workflow" \
   --strip-components=1
 ```

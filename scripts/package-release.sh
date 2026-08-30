@@ -77,5 +77,11 @@ done
 find "$stage_root" -type d -name __pycache__ -prune -exec rm -rf -- {} +
 find "$stage_root" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
 
+while IFS= read -r -d '' staged_file; do
+    relative_path=${staged_file#"$stage_root"/}
+    git -C "$root" ls-files --error-unmatch -- "$relative_path" >/dev/null 2>&1 ||
+        die "Release content is not tracked by Git: $relative_path"
+done < <(find "$stage_root" -type f -print0)
+
 tar -C "$stage_parent" -czf "$package_path" "$release_dir"
 printf 'Created release package: %s\n' "$package_path"

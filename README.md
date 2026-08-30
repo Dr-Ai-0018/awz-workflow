@@ -28,7 +28,7 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 
 ## 当前范围
 
-当前仓库在 `v0.2.0` 发布基线上继续覆盖这些事情：
+当前 `v0.3.0` 基线覆盖这些事情：
 
 - `AGENTS.md` / `CLAUDE.md` 的跨工具指导；
 - 新项目初始化卫生；
@@ -43,8 +43,8 @@ AWZ Workflow 把开发过程看成一个轻量但有纪律的循环：
 - 代码架构和文件复杂度基线；
 - 前端 UI 质量底线；
 - 新项目模板和初始化脚本。
-- 无第三方依赖的 Windows/POSIX 终端交互入口。
-- 位于业务项目之外、可跨项目映射的 Reference Library。
+- 无第三方依赖的 Windows/POSIX 终端控制中心。
+- 位于业务项目之外、可跨项目映射并支持安全 add/update/trash/restore 的 Reference Library。
 
 它暂时不追求成为完整脚手架、CI 平台或文档站。
 
@@ -146,7 +146,7 @@ AWZ 的 checkpoint 是轻量的信息收口约定，不监测 token，不介入 
 
 Reference Library 把 GSAP 这类长期参考源码放在业务项目之外，通过可提交的 `.awz/references.json` 映射给具体项目。Windows 默认优先 `D:\AWZ References`，没有 D 盘时回退 `%USERPROFILE%\AWZ References`；本机可以显式配置其他位置。
 
-初始化器只生成空 mapping 和 `docs/references/README.md` 背景/资料入口，不联网、不 clone。`context` 默认把本机解析结果写入同目录的 `reference-context.md`；真实第三方源码始终位于业务项目之外。参考库的 configure、add、map、context 和 doctor 使用独立命令，详见 [参考项目库工作流](workflows/reference-library.md)。
+初始化器只生成空 mapping 和 `docs/references/README.md` 背景/资料入口，不联网、不 clone。`context` 默认把本机解析结果写入同目录的 `reference-context.md`；真实第三方源码始终位于业务项目之外。参考库的 configure、add、map/context、check-update/update、unregister/trash/restore 和 doctor 由共享核心提供，并通过控制中心执行结构化预览与确认，详见 [参考项目库工作流](workflows/reference-library.md)。
 
 Reference Library 的写操作会在机器级 reference root 的 `logs/transactions/` 留下脱敏 transaction 记录，包含计划 hash、已完成/未完成 action、终态和失败恢复步骤。它用于审计与恢复，不保存 credential-bearing URL、token 或 cookie。
 

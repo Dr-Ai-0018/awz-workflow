@@ -101,6 +101,20 @@ try {
     Get-ChildItem -LiteralPath $stageRoot -Recurse -File -Include "*.pyc", "*.pyo" |
         Remove-Item -Force
 
+    $trackedFiles = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($trackedPath in @(& git -C $root -c core.quotepath=false ls-files)) {
+        [void]$trackedFiles.Add(([string]$trackedPath).Replace("\", "/"))
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "git ls-files failed while validating release contents."
+    }
+    foreach ($stagedFile in Get-ChildItem -LiteralPath $stageRoot -Recurse -File -Force) {
+        $relativePath = $stagedFile.FullName.Substring($stageRoot.Length).TrimStart([char[]]@('\', '/')).Replace("\", "/")
+        if (-not $trackedFiles.Contains($relativePath)) {
+            throw "Release content is not tracked by Git: $relativePath"
+        }
+    }
+
     & tar -C $stageParent -czf $packagePath $releaseDirectoryName
     if ($LASTEXITCODE -ne 0) {
         throw "tar failed with exit code $LASTEXITCODE"
