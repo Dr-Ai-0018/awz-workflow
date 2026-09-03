@@ -21,8 +21,9 @@
 3. 能复现就先复现或验证用户声称的问题。
 4. 明确 root cause 和 blast radius。
 5. 做最小安全修复。
-6. 运行 targeted verification。
-7. 如果改动影响共享行为，再扩大验证范围。
+6. 按 `workflows/verification-baseline.md` 评估 `V0–V3`，先运行最低充分的 targeted verification，并记录它对应的风险。
+7. 只有测试失败、相关代码继续变化、发现新风险或进入明确 gate，才扩大验证范围；focused 通过后不得仅为“更安心”自动升级 full suite。
+8. 同一代码树和同一命令已有通过证据时不重复执行；full suite、E2E、UI test、benchmark 需有明确任务、项目 gate 或用户确认。
 
 ## Checklist 文档
 

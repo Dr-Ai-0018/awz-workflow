@@ -10,6 +10,30 @@
 
 优先运行项目已经定义的 test、lint、typecheck、build、health check 或浏览器入口；具体命令以当前项目事实为准。
 
+## 风险比例与停止策略
+
+问题优先级 `P0/P1/P2/P3` 与验证级别分开：
+
+| 验证级别 | 典型改动 | 默认验证 |
+| --- | --- | --- |
+| `V0` | 文案、注释、格式、无行为配置 | diff review、语法或静态检查 |
+| `V1` | 单函数、单模块局部逻辑 | 相关 test file 或最小 smoke |
+| `V2` | 跨模块、API、schema、数据流 | 受影响模块 + 必要 integration/contract check |
+| `V3` | 公共核心、安全、并发、持久化、依赖、release | 明确范围的 Full Check；必要时 E2E/UI/build |
+
+### 标准开发节奏
+
+范围基线 → 风险分级 → 单切片实现 → diff review → 最小验证 → 停止/交接。每一步都要保持当前范围可解释；发现新风险时更新验证级别，不通过无关重构扩大任务。
+
+默认 focused-first，并遵守：
+
+- 每次验证前说明它验证的具体风险。
+- 同一代码树、同一命令、同一环境已经通过时，不重复执行。
+- focused 通过后不自动升级 full suite；只有失败、相关代码变化、新风险或明确 gate 才能升级。
+- full suite、E2E、UI test、benchmark 等昂贵验证必须由用户要求或项目 gate 触发；V3 风险只提高评估等级，不单独授予昂贵验证授权，否则先报告成本并等待确认或交给 CI。
+- 环境失败只做有限诊断和一次合理 fallback，之后报告 blocker，不无限换工具或重跑。
+- 达到验收条件后停止，并记录命令、结果、未覆盖风险和下一步。
+
 ## 环境与文本写入
 
 - 首次构建、已有项目接入或环境变化时，探测 OS、实际 shell executable/version、编码/行尾、runtime/package manager 和验证入口，再把有效事实写入 `docs/references/README.md`。
