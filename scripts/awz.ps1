@@ -220,10 +220,10 @@ function Invoke-InitializationWizard {
 
         $params = New-InitParams -Target $target -Project $project -LicenseOwner $licenseOwner -SelectedMode $selectedMode -Refresh $refresh
         Show-AwzTuiFrame -Title "正在生成变更计划" -Subtitle "只读检查，不会创建或修改文件" -Content @("", "                 ◇  ANALYZING TARGET", "", "                 检查目录、模板与 Git 前置条件…") -Step "01  模式   ───   02  信息   ───   03 [预览]  ───   04  执行" -Footer "请稍候"
-        $preview = @(& $InitializerPath @params -DryRun 2>&1 | ForEach-Object { $_.ToString() })
+        $preview = @(& $InitializerPath @params -DryRun *>&1 | ForEach-Object { $_.ToString() })
         Show-AwzTuiLog -Title "DryRun 检查完成" -Subtitle "以下是将要发生的全部变更" -Lines $preview -Step "01  模式   ───   02  信息   ───   03 [预览]  ───   04  执行"
         $apply = Show-AwzTuiPreview -PreviewLines $preview -Target $target -Project $project -SelectedMode $selectedMode -Refresh $refresh
-        if ($apply -eq "__AWZ_EXIT__" -or $apply -eq "__AWZ_BACK__" -or -not $apply) { return }
+        if ($apply -ne "__AWZ_APPLY__") { return }
 
         if ($selectedMode -eq "Existing" -and $refresh) {
             $confirmation = Read-AwzTuiText -Title "高风险确认" -Label "输入 APPLY 继续刷新 AWZ 指导文件" -Hint "README、LICENSE、.gitignore 与 .env.example 仍不会被覆盖" -Step "01  模式   ───   02  信息   ───   03  预览   ───   04 [执行]" -Required -AllowBack -ExitOnQuit
@@ -231,7 +231,7 @@ function Invoke-InitializationWizard {
         }
 
         Show-AwzTuiFrame -Title "正在应用" -Subtitle "底层初始化器正在执行已预览的计划" -Content @("", "                 ◆  APPLYING BASELINE", "", "                 写入模板并验证 Git 状态…") -Step "01  模式   ───   02  信息   ───   03  预览   ───   04 [执行]" -Footer "请勿关闭终端"
-        $applyOutput = @(& $InitializerPath @params 2>&1 | ForEach-Object { $_.ToString() })
+        $applyOutput = @(& $InitializerPath @params *>&1 | ForEach-Object { $_.ToString() })
         Show-AwzTuiLog -Title "初始化已执行" -Subtitle "以下是本次实际写入与创建的结果" -Lines $applyOutput -Step "01  模式   ───   02  信息   ───   03  预览   ───   04 [执行]"
         $gitStatus = @()
         if (Test-Path -LiteralPath (Join-Path $target ".git")) {

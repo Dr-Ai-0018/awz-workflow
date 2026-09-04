@@ -44,6 +44,9 @@ try {
     Assert-True $tuiModuleSource.Contains('Start-Sleep -Seconds $PauseSeconds') "Activity logs must remain visible before the next view replaces them"
     Assert-True $tuiModuleSource.Contains("H 或 ?") "TUI input pages must expose a help semantic"
     Assert-True $tuiModuleSource.Contains("B 返回上一步") "TUI preview must expose a back semantic"
+    Assert-True $tuiModuleSource.Contains('return "__AWZ_APPLY__"') "TUI preview must return an explicit apply token"
+    Assert-True $tuiSource.Contains('if ($apply -ne "__AWZ_APPLY__") { return }') "Initialization wizard must only apply an explicit apply token"
+    Assert-True (($tuiSource.Split('*>&1').Count - 1) -ge 2) "Initialization wizard must capture every DryRun and apply output stream"
     Assert-True $tuiSource.Contains("function Invoke-AwzJsonCommand") "Control center must consume structured command results"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceBrowser") "Control center is missing the Reference Library browser"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceAdd") "Control center is missing the Reference add flow"
@@ -56,6 +59,14 @@ try {
     Assert-True $tuiSource.Contains("function Invoke-ReferenceProjectActions") "Control center is missing project mapping lifecycle actions"
     Assert-True $tuiSource.Contains("function Invoke-ReferenceDoctor") "Control center is missing Doctor"
     Assert-True $tuiSource.Contains("function Invoke-RefreshCheck") "Control center is missing the safe refresh check"
+
+    $applyDecision = & $tuiRuntime {
+        function Read-AwzTuiInput { param([string]$Prompt) "A" }
+        function Show-AwzTuiFrame { param($Title, $Subtitle, $Content, $Step, $Footer) }
+        Show-AwzTuiPreview -PreviewLines @("DryRun: smoke") -Target "E:\Smoke" -Project "Smoke" -SelectedMode "Existing" -Refresh $false
+    }
+    Assert-True ($applyDecision -ceq "__AWZ_APPLY__") "TUI preview did not return the explicit apply token"
+    $tuiRuntime = Import-Module $tuiModule -Force -PassThru
 
     $demo = @(& $tui -RenderDemo)
     $demoText = $demo -join "`n"

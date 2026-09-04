@@ -438,7 +438,7 @@ function Show-AwzTuiPreview {
         }
         $choice = $rawChoice.Trim()
         if ($choice -match '^[aA]$') {
-            return $true
+            return "__AWZ_APPLY__"
         }
         if ($choice -match '^[qQ]$') {
             return "__AWZ_EXIT__"
