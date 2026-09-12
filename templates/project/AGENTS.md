@@ -25,7 +25,7 @@
 - 能运行真实验证就运行；无法验证时说明未验证项、原因和风险。
 - 不打印、提交或完整复述 secret、token、cookie、私有 URL 和真实 `.env`。
 - 默认不提交 `.codex/`、`.claude/`、`.vscode/`、`AGENTS.md`、`CLAUDE.md`、`docs/`、`temp/`、`.env` 或 `.env.*`；`.env.example` 应保持可提交且只含示例值。
-- CAPTCHA、MFA、password、secret rotation、破坏性数据操作、大范围架构重写、新增 heavyweight production dependency 时停下等待用户。
+- CAPTCHA、MFA、password、secret rotation、破坏性数据操作、大范围架构重写、新增 heavyweight production dependency 时停下等待用户；递归删除或清理计算路径时按 onboarding 读取安全指南。
 - 重要结论不能只留在 ignored 本地文档；需要长期共享时提升到代码、README、正式文档、ADR、issue 或 PR。
 
 ## 信息边界
