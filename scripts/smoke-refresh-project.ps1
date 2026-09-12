@@ -5,10 +5,13 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
+$tempRoot = Join-Path $root "temp"
 $initializer = Join-Path $PSScriptRoot "init-project.ps1"
 $refresh = Join-Path $PSScriptRoot "refresh-project.ps1"
 $smokeRoot = Join-Path $root ("temp/smoke-refresh-" + [guid]::NewGuid().ToString("N"))
 $project = Join-Path $smokeRoot "project"
+
+Import-Module (Join-Path $PSScriptRoot "lib/AwzSafety.psm1") -Force
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -49,6 +52,6 @@ try {
 }
 finally {
     if ((-not $KeepArtifacts) -and (Test-Path -LiteralPath $smokeRoot)) {
-        Remove-Item -LiteralPath $smokeRoot -Recurse -Force
+        Remove-AwzSafeTree -Path $smokeRoot -AllowedRoot $tempRoot
     }
 }

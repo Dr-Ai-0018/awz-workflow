@@ -4,6 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
+$tempRoot = Join-Path $root "temp"
 $referenceCli = Join-Path $PSScriptRoot "reference-library.ps1"
 $initializer = Join-Path $PSScriptRoot "init-project.ps1"
 $smokeRoot = Join-Path $root ("temp/smoke-reference-" + [guid]::NewGuid().ToString("N"))
@@ -12,6 +13,8 @@ $libraryRoot = Join-Path $smokeRoot "library"
 $fixtureRepo = Join-Path $smokeRoot "fixture-repo"
 $projectPath = Join-Path $smokeRoot "project"
 $oldConfigDir = $env:AWZ_CONFIG_DIR
+
+Import-Module (Join-Path $PSScriptRoot "lib/AwzSafety.psm1") -Force
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -41,7 +44,7 @@ try {
     $missingRoot = Join-Path $smokeRoot "missing-library"
     @{ schemaVersion = 1; referenceRoot = $missingRoot } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $configDir "config.json") -Encoding UTF8
     Invoke-Reference -Arguments @("doctor") -ExpectedExitCode 1 | Out-Null
-    Remove-Item -LiteralPath $configDir -Recurse -Force
+    Remove-AwzSafeTree -Path $configDir -AllowedRoot $tempRoot
 
     New-Item -ItemType Directory -Path $fixtureRepo -Force | Out-Null
     git -C $fixtureRepo init -b main | Out-Null
@@ -120,7 +123,7 @@ try {
     $brokenStatus = (($brokenStatusOutput -join "`n") | ConvertFrom-Json)
     $brokenRow = @($brokenStatus.data.references | Where-Object { $_.id -eq "broken" })[0]
     Assert-True ($brokenRow.status -eq "invalid") "status treated a broken nested .git directory as the parent repository"
-    Remove-Item -LiteralPath $brokenRepo -Recurse -Force
+    Remove-AwzSafeTree -Path $brokenRepo -AllowedRoot $tempRoot
     Remove-Item -LiteralPath (Join-Path $libraryRoot "catalog/broken.json") -Force
 
     @{
@@ -187,6 +190,6 @@ finally {
         $env:AWZ_CONFIG_DIR = $oldConfigDir
     }
     if ((-not $KeepArtifacts) -and (Test-Path -LiteralPath $smokeRoot)) {
-        Remove-Item -LiteralPath $smokeRoot -Recurse -Force
+        Remove-AwzSafeTree -Path $smokeRoot -AllowedRoot $tempRoot
     }
 }

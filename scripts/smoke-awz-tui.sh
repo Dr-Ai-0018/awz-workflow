@@ -8,6 +8,7 @@ die() {
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 root=$(cd "$script_dir/.." && pwd -P)
+temp_root="$root/temp"
 tui="$script_dir/awz.sh"
 dryrun_path="$root/temp/smoke-tui-dryrun-${RANDOM}-${RANDOM}"
 long_segment=$(printf '段%.0s' {1..60})
@@ -19,6 +20,8 @@ read_only_path="$root/temp/smoke-tui-readonly-${RANDOM}-${RANDOM}"
 mapping_project="$read_only_path/mapping-project"
 keep_artifacts=false
 
+. "$script_dir/lib/awz-safety.sh"
+
 if [[ "${1:-}" == '--keep-artifacts' ]]; then
     keep_artifacts=true
     shift
@@ -27,7 +30,12 @@ fi
 
 cleanup() {
     if [[ "$keep_artifacts" != true ]]; then
-        rm -rf "$dryrun_path" "$long_dryrun_path" "$cancel_path" "$apply_path" "$occupied_path" "$read_only_path"
+        awz_safe_remove_tree "$dryrun_path" "$temp_root"
+        awz_safe_remove_tree "$long_dryrun_path" "$temp_root"
+        awz_safe_remove_tree "$cancel_path" "$temp_root"
+        awz_safe_remove_tree "$apply_path" "$temp_root"
+        awz_safe_remove_tree "$occupied_path" "$temp_root"
+        awz_safe_remove_tree "$read_only_path" "$temp_root"
     fi
 }
 trap cleanup EXIT

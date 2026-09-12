@@ -17,12 +17,15 @@ assert_single_trailing_line_break() {
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 root=$(cd "$script_dir/.." && pwd -P)
+temp_root="$root/temp"
 initializer="$script_dir/init-project.sh"
 smoke_path="$root/temp/smoke-init-${RANDOM}-${RANDOM}"
 occupied_path="$root/temp/smoke-occupied-${RANDOM}-${RANDOM}"
 missing_existing_path="$root/temp/smoke-missing-existing-${RANDOM}-${RANDOM}"
 invalid_target="$root/temp/smoke-target-file-${RANDOM}-${RANDOM}"
 keep_artifacts=false
+
+. "$script_dir/lib/awz-safety.sh"
 
 if [[ "${1:-}" == "--keep-artifacts" ]]; then
     keep_artifacts=true
@@ -34,9 +37,9 @@ fi
 cleanup() {
     rm -f "$invalid_target"
     if [[ "$keep_artifacts" != true ]]; then
-        rm -rf "$smoke_path"
-        rm -rf "$occupied_path"
-        rm -rf "$missing_existing_path"
+        awz_safe_remove_tree "$smoke_path" "$temp_root"
+        awz_safe_remove_tree "$occupied_path" "$temp_root"
+        awz_safe_remove_tree "$missing_existing_path" "$temp_root"
     fi
 }
 trap cleanup EXIT
@@ -67,6 +70,8 @@ fi
 grep -Fq '开发环境基线' "$smoke_path/docs/references/README.md" || die 'reference index is missing the development environment baseline'
 grep -Fq 'guides/verification.md' "$smoke_path/docs/references/README.md" || die 'reference index is missing the cold verification pointer'
 grep -Fq 'executable/version' "$smoke_path/docs/agent-room/guides/verification.md" || die 'verification guide is missing shell environment details'
+grep -Fq 'HOME' "$smoke_path/docs/agent-room/guides/blockers-and-safety.md" || die 'safety guide is missing protected environment variables'
+grep -Fq 'guarded cleanup' "$smoke_path/docs/agent-room/guides/blockers-and-safety.md" || die 'safety guide is missing guarded cleanup rules'
 grep -Fq '项目构建启动顺序' "$smoke_path/docs/agent-room/onboarding.md" || die 'onboarding is missing the probe-before-build route'
 grep -Fq '主线与插入请求' "$smoke_path/docs/agent-room/onboarding.md" || die 'onboarding is missing mainline continuity rules'
 grep -Fq '主 Checklist' "$smoke_path/docs/agent-room/status.md" || die 'status is missing the primary checklist pointer'

@@ -8,11 +8,14 @@ die() {
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 root=$(cd "$script_dir/.." && pwd -P)
+temp_root="$root/temp"
 initializer="$script_dir/init-project.sh"
 refresh="$script_dir/refresh-project.sh"
 smoke_root="$root/temp/smoke-refresh-${RANDOM}-${RANDOM}"
 project="$smoke_root/project"
 keep_artifacts=false
+
+. "$script_dir/lib/awz-safety.sh"
 
 if command -v python3 >/dev/null 2>&1; then
     python_bin=python3
@@ -30,7 +33,7 @@ fi
 
 cleanup() {
     if [[ "$keep_artifacts" != true ]]; then
-        rm -rf "$smoke_root"
+        awz_safe_remove_tree "$smoke_root" "$temp_root"
     fi
 }
 trap cleanup EXIT

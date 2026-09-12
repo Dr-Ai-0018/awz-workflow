@@ -5,6 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
+$tempRoot = Join-Path $root "temp"
 $initializer = Join-Path $PSScriptRoot "init-project.ps1"
 $batchInitializer = Join-Path $PSScriptRoot "init-project.bat"
 $smokePath = Join-Path $root ("temp/smoke-init-" + [guid]::NewGuid().ToString("N"))
@@ -13,6 +14,8 @@ $helpProbePath = Join-Path $root ("temp/smoke-help-" + [guid]::NewGuid().ToStrin
 $occupiedPath = Join-Path $root ("temp/smoke-occupied-" + [guid]::NewGuid().ToString("N"))
 $missingExistingPath = Join-Path $root ("temp/smoke-missing-existing-" + [guid]::NewGuid().ToString("N"))
 $invalidTarget = Join-Path $root ("temp/smoke-target-file-" + [guid]::NewGuid().ToString("N"))
+
+Import-Module (Join-Path $PSScriptRoot "lib/AwzSafety.psm1") -Force
 
 function Assert-True {
     param(
@@ -85,6 +88,8 @@ try {
     Assert-True ($generatedReferences.Contains("guides/verification.md")) "reference index is missing the cold verification pointer"
     $generatedVerification = Get-Content -LiteralPath (Join-Path $smokePath "docs/agent-room/guides/verification.md") -Raw -Encoding UTF8
     Assert-True ($generatedVerification.Contains("executable/version")) "verification guide is missing shell environment details"
+    $generatedSafety = Get-Content -LiteralPath (Join-Path $smokePath "docs/agent-room/guides/blockers-and-safety.md") -Raw -Encoding UTF8
+    Assert-True ($generatedSafety.Contains("HOME") -and $generatedSafety.Contains("guarded cleanup")) "safety guide is missing guarded cleanup rules"
     $generatedOnboarding = Get-Content -LiteralPath (Join-Path $smokePath "docs/agent-room/onboarding.md") -Raw -Encoding UTF8
     Assert-True ($generatedOnboarding.Contains("Git/dirty state")) "onboarding is missing the probe-before-build route"
     Assert-True ($generatedOnboarding.Contains("status") -and $generatedOnboarding.Contains("checklist")) "onboarding is missing mainline continuity rules"
@@ -201,7 +206,7 @@ finally {
     if (-not $KeepArtifacts) {
         foreach ($path in @($smokePath, $batchSmokePath, $helpProbePath, $occupiedPath, $missingExistingPath)) {
             if (Test-Path -LiteralPath $path) {
-                Remove-Item -LiteralPath $path -Recurse -Force
+                Remove-AwzSafeTree -Path $path -AllowedRoot $tempRoot
             }
         }
     }

@@ -5,6 +5,7 @@
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
+$tempRoot = Join-Path $root "temp"
 $tui = Join-Path $PSScriptRoot "awz.ps1"
 $batchTui = Join-Path $PSScriptRoot "awz.bat"
 $tuiModule = Join-Path $PSScriptRoot "lib/AwzTui.psm1"
@@ -17,6 +18,8 @@ $batchDryRunPath = Join-Path $root ("temp/smoke-tui-bat-" + [guid]::NewGuid().To
 $applyPath = Join-Path $root ("temp/smoke-tui-apply-" + [guid]::NewGuid().ToString("N"))
 $occupiedPath = Join-Path $root ("temp/smoke-tui-occupied-" + [guid]::NewGuid().ToString("N"))
 $readOnlyFixture = Join-Path $root ("temp/smoke-tui-readonly-" + [guid]::NewGuid().ToString("N"))
+
+Import-Module (Join-Path $PSScriptRoot "lib/AwzSafety.psm1") -Force
 $mappingProject = Join-Path $readOnlyFixture "mapping-project"
 $previousConfigDir = $env:AWZ_CONFIG_DIR
 $previousReferenceRoot = $env:AWZ_REFERENCE_ROOT
@@ -182,7 +185,7 @@ finally {
     if (-not $KeepArtifacts) {
         foreach ($path in @($dryRunPath, $longDryRunPath, $cancelPath, $batchDryRunPath, $applyPath, $occupiedPath, $readOnlyFixture)) {
             if (Test-Path -LiteralPath $path) {
-                Remove-Item -LiteralPath $path -Recurse -Force
+                Remove-AwzSafeTree -Path $path -AllowedRoot $tempRoot
             }
         }
     }

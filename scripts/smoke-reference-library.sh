@@ -8,6 +8,7 @@ die() {
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 root=$(cd "$script_dir/.." && pwd -P)
+temp_root="$root/temp"
 reference_cli="$script_dir/reference-library.sh"
 initializer="$script_dir/init-project.sh"
 smoke_root="$root/temp/smoke-reference-${RANDOM}-${RANDOM}"
@@ -17,6 +18,8 @@ fixture_repo="$smoke_root/fixture-repo"
 project_path="$smoke_root/project"
 keep_artifacts=false
 
+. "$script_dir/lib/awz-safety.sh"
+
 if [[ "${1:-}" == '--keep-artifacts' ]]; then
     keep_artifacts=true
     shift
@@ -25,7 +28,7 @@ fi
 
 cleanup() {
     if [[ "$keep_artifacts" != true && -d "$smoke_root" ]]; then
-        rm -rf "$smoke_root"
+        awz_safe_remove_tree "$smoke_root" "$temp_root"
     fi
 }
 trap cleanup EXIT
@@ -40,7 +43,7 @@ printf '{"schemaVersion":1,"referenceRoot":"%s"}\n' "$smoke_root/missing-library
 if bash "$reference_cli" doctor >/dev/null 2>&1; then
     die 'doctor accepted a missing reference root'
 fi
-rm -rf "$config_dir"
+awz_safe_remove_tree "$config_dir" "$temp_root"
 
 mkdir -p "$fixture_repo"
 git -C "$fixture_repo" init -b main >/dev/null
@@ -113,7 +116,7 @@ mkdir -p "$broken_repo/.git"
 printf '%s\n' '{"schemaVersion":2,"id":"broken","relativePath":"repos/broken","repositoryUrl":"https://example.com/broken.git","revision":"missing"}' > "$library_root/catalog/broken.json"
 broken_status=$(bash "$reference_cli" status --json)
 printf '%s\n' "$broken_status" | grep -A8 '"id": "broken"' | grep -Fq '"status": "invalid"' || die 'status treated a broken nested .git directory as the parent repository'
-rm -rf "$broken_repo"
+awz_safe_remove_tree "$broken_repo" "$temp_root"
 rm -f "$library_root/catalog/broken.json"
 
 printf '%s\n' '{"schemaVersion":2,"id":"unsafe-catalog","relativePath":"repos/unsafe-catalog","repositoryUrl":"https://example.com/unsafe.git?token=catalog-secret","revision":"missing"}' > "$library_root/catalog/unsafe-catalog.json"
