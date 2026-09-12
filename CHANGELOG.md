@@ -44,6 +44,7 @@
 - Release 打包会排除 Python `__pycache__`、`.pyc` 与 `.pyo` 本机缓存。
 - Release staging 只接受 Git tracked 文件，避免 ignored `.env`、日志或本机状态被整目录复制进分发包。
 - Release 包直接归档 committed `HEAD` 的 tracked blobs，避免 Windows/POSIX checkout 行尾转换导致同一 commit 产生不同 payload。
+- Release 包使用固定 gzip header 与 stored DEFLATE blocks，避免不同 zlib 版本把相同 tar 压缩成不同字节。
 - `Existing -Force` 不再覆盖项目持续维护的 references、status 与协作策略配置。
 - TUI 在 44–108 列窗口中保持完整 frame，并按 grapheme 安全处理中文、ZWJ emoji、国旗 emoji 和变体选择符。
 - Windows/POSIX 控制中心在输入流关闭或用户取消时安全退出，不再触发 null error 或产生目标文件。

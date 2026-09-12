@@ -25,6 +25,13 @@ $root = Split-Path -Parent $PSScriptRoot
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     throw "Git is required to validate the release worktree."
 }
+$python = Get-Command python -ErrorAction SilentlyContinue
+if (-not $python) {
+    $python = Get-Command python3 -ErrorAction SilentlyContinue
+}
+if (-not $python) {
+    throw "Python 3 is required to create a byte-stable release archive."
+}
 
 $version = ((& git -C $root show "HEAD:VERSION") -join "`n").Trim()
 if ($LASTEXITCODE -ne 0) {
@@ -53,6 +60,7 @@ $packagePath = Join-Path $outputPath "$releaseDirectoryName.tar.gz"
 if (Test-Path -LiteralPath $packagePath) {
     throw "Package already exists: $packagePath"
 }
+$tarPath = Join-Path $outputPath ".$releaseDirectoryName.$([guid]::NewGuid().ToString('N')).tar"
 
 $releasePaths = @(
     "VERSION",
@@ -73,12 +81,26 @@ foreach ($relativePath in $releasePaths) {
     }
 }
 
-& git -C $root -c core.autocrlf=false archive --format=tar.gz "--prefix=$releaseDirectoryName/" "--output=$packagePath" HEAD -- @releasePaths
-if ($LASTEXITCODE -ne 0) {
+try {
+    & git -C $root -c core.autocrlf=false archive --format=tar "--prefix=$releaseDirectoryName/" "--output=$tarPath" HEAD -- @releasePaths
+    if ($LASTEXITCODE -ne 0) {
+        throw "git archive failed with exit code $LASTEXITCODE"
+    }
+    & $python.Source (Join-Path $PSScriptRoot "lib\deterministic_gzip.py") $tarPath $packagePath
+    if ($LASTEXITCODE -ne 0) {
+        throw "deterministic gzip failed with exit code $LASTEXITCODE"
+    }
+}
+catch {
     if (Test-Path -LiteralPath $packagePath) {
         Remove-Item -LiteralPath $packagePath -Force
     }
-    throw "git archive failed with exit code $LASTEXITCODE"
+    throw
+}
+finally {
+    if (Test-Path -LiteralPath $tarPath) {
+        Remove-Item -LiteralPath $tarPath -Force
+    }
 }
 
 Write-Host "Created release package from committed HEAD: $packagePath"

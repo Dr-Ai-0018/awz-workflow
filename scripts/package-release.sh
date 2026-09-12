@@ -45,6 +45,13 @@ while (($# > 0)); do
 done
 
 command -v git >/dev/null 2>&1 || die 'Git is required to validate the release worktree.'
+if command -v python3 >/dev/null 2>&1; then
+    python_command=python3
+elif command -v python >/dev/null 2>&1; then
+    python_command=python
+else
+    die 'Python 3 is required to create a byte-stable release archive.'
+fi
 
 version=$(git -C "$root" show HEAD:VERSION | tr -d '\r\n') || die 'VERSION is missing from HEAD.'
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$ ]] || die "Invalid VERSION in HEAD: $version"
@@ -59,6 +66,11 @@ release_dir="awz-workflow-v$version"
 package_path="$output_dir/$release_dir.tar.gz"
 
 [[ ! -e "$package_path" ]] || die "Package already exists: $package_path"
+tar_path=$(mktemp "$output_dir/.${release_dir}.XXXXXXXX")
+cleanup_tar() {
+    rm -f -- "$tar_path"
+}
+trap cleanup_tar EXIT
 
 release_paths=(VERSION CHANGELOG.md LICENSE README.md requirements style workflows templates scripts)
 for path in "${release_paths[@]}"; do
@@ -66,12 +78,16 @@ for path in "${release_paths[@]}"; do
 done
 
 if ! git -C "$root" -c core.autocrlf=false archive \
-    --format=tar.gz \
+    --format=tar \
     --prefix="$release_dir/" \
-    --output="$package_path" \
+    --output="$tar_path" \
     HEAD -- "${release_paths[@]}"; then
-    rm -f -- "$package_path"
     die 'git archive failed.'
+fi
+
+if ! "$python_command" "$script_dir/lib/deterministic_gzip.py" "$tar_path" "$package_path"; then
+    rm -f -- "$package_path"
+    die 'deterministic gzip failed.'
 fi
 
 printf 'Created release package from committed HEAD: %s\n' "$package_path"
